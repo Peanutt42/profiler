@@ -24,7 +24,7 @@ impl Drop for Scope {
 #[macro_export]
 macro_rules! scope {
 	($name:expr) => {
-		profiler::Scope::new(format!("{}::{}", profiler::function_name!(), $name))
+		let _scope = profiler::Scope::new(format!("{}::{}", profiler::function_name!(), $name));
 	};
 }
 
@@ -53,8 +53,8 @@ impl<'a> Drop for CustomScope<'a> {
 
 #[macro_export]
 macro_rules! custom_scope {
-	($profiler:expr) => {
-		profiler::CustomScope::new(profiler::function_name!().to_string(), $profiler)
+	($profiler:expr, $name:expr) => {
+		let _scope = profiler::CustomScope::new(format!("{}::{}", profiler::function_name!(), $name), $profiler);
 	};
 }
 

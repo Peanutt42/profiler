@@ -15,7 +15,7 @@ fn simple() {
 	}
 	for i in 0..10 {
 		{
-			let _scope = scope!("scope_task");
+			scope!("scope_task");
             std::thread::sleep(std::time::Duration::from_millis(10));
 		}
 
@@ -30,7 +30,7 @@ fn custom() {
 
 	for i in 0..10 {
 		{
-			let _scope = custom_scope!(&mut profiler);
+			custom_scope!(&mut profiler, "scope_task");
 			std::thread::sleep(std::time::Duration::from_millis(10));
 		}
 		profiler.new_frame();
