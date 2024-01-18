@@ -7,4 +7,10 @@ edition = "2021"
 name = "profiler"
 path = "src/lib.rs"
 
+[workspace]
+members = [
+	"profiler-attributes",
+]
+
 [dependencies]
+profiler-attributes = { path = "profiler-attributes" }

@@ -2,33 +2,60 @@ use std::time::{Instant, Duration};
 use std::cell::RefCell;
 
 pub struct Scope {
-	pub name: &'static str,
+	pub name: String,
     pub start: Instant,
-	pub duration: Duration,
 }
 
 impl Scope {
-	pub fn new(name: &'static str) -> Self {
+	pub fn new(name: String) -> Self {
 		Self {
 			name,
 			start: Instant::now(),
-            duration: Duration::new(0, 0),
 		}
 	}
 }
 
 impl Drop for Scope {
 	fn drop(&mut self) {
-		self.duration = self.start.elapsed();
-		println!("{} took {}", self.name, self.duration.as_secs_f32());
+        PROFILER.with(|p| p.borrow_mut().submit_dynamic_scope(&self.name, self.start, self.start.elapsed()));
+    }
+}
+
+#[macro_export]
+macro_rules! scope {
+	($name:expr) => {
+		profiler::Scope::new(format!("{}::{}", profiler::function_name!(), $name))
+	};
+}
+
+pub struct CustomScope<'a> {
+	pub name: String,
+    pub start: Instant,
+	profiler: &'a mut Profiler,
+}
+
+impl<'a> CustomScope<'a> {
+	pub fn new(name: String, profiler: &'a mut Profiler) -> Self {
+		Self {
+			name,
+            start: Instant::now(),
+            profiler,
+		}
+	}
+}
+
+impl<'a> Drop for CustomScope<'a> {
+	fn drop(&mut self) {
+		let duration = self.start.elapsed();
+		self.profiler.submit_dynamic_scope(&self.name, self.start, duration);
 	}
 }
 
 #[macro_export]
-macro_rules! profile_scope {
-    () => {
-        let scope = profiler::Scope::new(profiler::function_name!());
-    };
+macro_rules! custom_scope {
+	($profiler:expr) => {
+		profiler::CustomScope::new(profiler::function_name!().to_string(), $profiler)
+	};
 }
 
 #[macro_export]
@@ -57,6 +84,14 @@ impl Profiler {
 	pub fn new_frame(&mut self) {
 
 	}
+
+	pub fn submit_scope(&mut self, name: &str, start: Instant, duration: Duration) {
+		println!("{} took {}ms", name, duration.as_millis());
+    }
+
+	pub fn submit_dynamic_scope(&mut self, name: &String, start: Instant, duration: Duration) {
+		println!("{} took {}ms", name, duration.as_millis());
+    }
 }
 
 thread_local! {
@@ -67,7 +102,7 @@ thread_local! {
 macro_rules! new_frame {
 	() => {
 		{
-			PROFILER.with(|p| p.borrow_mut().new_frame());
+			profiler::PROFILER.with(|p| p.borrow_mut().new_frame());
 		}
 	};
 }

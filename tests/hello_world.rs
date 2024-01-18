@@ -1,19 +1,38 @@
-use profiler::{Profiler, Scope, PROFILER, new_frame, profile_scope, function_name};
+use profiler::{Profiler, new_frame, scope, custom_scope};
+use profiler_attributes::profile;
 
-#[test]
-fn hello_world() {
-	for i in 0..10 {
-		let scope = Scope::new(function_name!());
-
-		PROFILER.with(|p| p.borrow_mut().new_frame());
-	}
+#[profile]
+fn work() {
+	std::thread::sleep(std::time::Duration::from_millis(10));
 }
 
 #[test]
-fn hello_world_macros() {
+fn simple() {
 	for i in 0..10 {
-		profile_scope!();
+		work();
 
 		new_frame!();
+	}
+	for i in 0..10 {
+		{
+			let _scope = scope!("scope_task");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+		}
+
+		new_frame!();
+	}
+}
+
+
+#[test]
+fn custom() {
+	let mut profiler = Profiler::new();
+
+	for i in 0..10 {
+		{
+			let _scope = custom_scope!(&mut profiler);
+			std::thread::sleep(std::time::Duration::from_millis(10));
+		}
+		profiler.new_frame();
 	}
 }
