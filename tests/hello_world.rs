@@ -8,12 +8,12 @@ fn work() {
 
 #[test]
 fn simple() {
-	for i in 0..10 {
+	for _ in 0..10 {
 		work();
 
 		new_frame!();
 	}
-	for i in 0..10 {
+	for _ in 0..10 {
 		{
 			scope!("scope_task");
             std::thread::sleep(std::time::Duration::from_millis(10));
@@ -28,7 +28,7 @@ fn simple() {
 fn custom() {
 	let mut profiler = Profiler::new();
 
-	for i in 0..10 {
+	for _ in 0..10 {
 		{
 			custom_scope!(&mut profiler, "scope_task");
 			std::thread::sleep(std::time::Duration::from_millis(10));
