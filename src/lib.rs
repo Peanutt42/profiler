@@ -8,30 +8,23 @@ mod function_name;
 pub struct Scope {
 	pub name: String,
     pub start: Instant,
-	pub duration: Duration,
 }
 
 impl Scope {
 	pub fn new(name: String) -> Self {
-		//let mut start = 0;
-		//PROFILER.with(|p| start = Instant::now().duration_since(p.borrow().program_start).as_millis());
-		//println!("{} started {}ms", name, start);
-
 		Self {
 			name,
 			start: Instant::now(),
-			duration: Duration::new(0, 0),
 		}
 	}
 }
 
 impl Drop for Scope {
 	fn drop(&mut self) {
-		self.duration = self.start.elapsed();
-        let _ = PROFILER.try_with(|p| {
-			if let Ok(mut p) = p.try_borrow_mut() {
-				p.submit_scope(self.name.clone(), self.start, self.duration);
-			}
+		let duration = self.start.elapsed();
+
+        PROFILER.with(|p| {
+			p.borrow_mut().submit_profile_result(ProfileResult::new(self.name.clone(), self.start, duration));
 		});
     }
 }
@@ -43,15 +36,31 @@ macro_rules! scope {
 	};
 }
 
+struct ProfileResult {
+	name: String,
+    start: Instant,
+    duration: Duration,
+}
+
+impl ProfileResult {
+	pub fn new(name: String, start: Instant, duration: Duration) -> Self {
+		Self {
+            name,
+            start,
+            duration,
+        }
+	}
+}
+
 
 struct Frame {
-	scopes: Vec<Scope>,
+	profile_results: Vec<ProfileResult>,
 }
 
 impl Frame {
 	fn new() -> Self {
 		Self {
-			scopes: Vec::new(),
+			profile_results: Vec::new(),
 		}
 	}
 }
@@ -73,12 +82,12 @@ impl Profiler {
 		self.frames.push(Frame::new());
 	}
 
-	fn submit_scope(&mut self, name: String, start: Instant, duration: Duration) {
+	fn submit_profile_result(&mut self, profile_result: ProfileResult) {
 		if self.frames.is_empty() {
 			self.frames.push(Frame::new());
 		}
 
-		self.frames.last_mut().unwrap().scopes.push(Scope { name, start, duration });
+		self.frames.last_mut().unwrap().profile_results.push(profile_result);
 	}
 }
 
