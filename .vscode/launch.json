@@ -7,17 +7,35 @@
 		{
 			"type": "lldb",
 			"request": "launch",
-			"name": "Unit Test",
+			"name": "Debug example 'hello_world'",
+			"cargo": {
+				"args": [
+					"build",
+					"--example=hello_world",
+					"--package=profiler-rs"
+				],
+				"filter": {
+					"name": "hello_world",
+					"kind": "example"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Unit Test function_name!()",
 			"cargo": {
 				"args": [
 					"test",
 					"--no-run",
-					"--lib",
+					"--test=function_name",
 					"--package=profiler-rs"
 				],
 				"filter": {
-					"name": "profiler",
-					"kind": "lib"
+					"name": "function_name",
+					"kind": "test"
 				}
 			},
 			"args": [],

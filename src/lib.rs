@@ -1,23 +1,38 @@
 use std::time::{Instant, Duration};
 use std::cell::RefCell;
 
+mod chrome_tracing;
+mod function_name;
+
+#[derive(Clone)]
 pub struct Scope {
 	pub name: String,
     pub start: Instant,
+	pub duration: Duration,
 }
 
 impl Scope {
 	pub fn new(name: String) -> Self {
+		//let mut start = 0;
+		//PROFILER.with(|p| start = Instant::now().duration_since(p.borrow().program_start).as_millis());
+		//println!("{} started {}ms", name, start);
+
 		Self {
 			name,
 			start: Instant::now(),
+			duration: Duration::new(0, 0),
 		}
 	}
 }
 
 impl Drop for Scope {
 	fn drop(&mut self) {
-        PROFILER.with(|p| p.borrow_mut().submit_scope(&self.name, self.start, self.start.elapsed()));
+		self.duration = self.start.elapsed();
+        let _ = PROFILER.try_with(|p| {
+			if let Ok(mut p) = p.try_borrow_mut() {
+				p.submit_scope(self.name.clone(), self.start, self.duration);
+			}
+		});
     }
 }
 
@@ -28,66 +43,43 @@ macro_rules! scope {
 	};
 }
 
-pub struct CustomScope<'a> {
-	pub name: String,
-    pub start: Instant,
-	profiler: &'a mut Profiler,
+
+struct Frame {
+	scopes: Vec<Scope>,
 }
 
-impl<'a> CustomScope<'a> {
-	pub fn new(name: String, profiler: &'a mut Profiler) -> Self {
+impl Frame {
+	fn new() -> Self {
 		Self {
-			name,
-            start: Instant::now(),
-            profiler,
+			scopes: Vec::new(),
 		}
 	}
 }
 
-impl<'a> Drop for CustomScope<'a> {
-	fn drop(&mut self) {
-		let duration = self.start.elapsed();
-		self.profiler.submit_scope(&self.name, self.start, duration);
-	}
-}
-
-#[macro_export]
-macro_rules! custom_scope {
-	($profiler:expr, $name:expr) => {
-		let _scope = profiler::CustomScope::new(format!("{}::{}", profiler::function_name!(), $name), $profiler);
-	};
-}
-
-#[macro_export]
-macro_rules! function_name {
-    () => {{
-        fn f() {}
-        fn type_name_of<T>(_: T) -> &'static str {
-            std::any::type_name::<T>()
-        }
-        let name = type_name_of(f);
-        name.strip_suffix("::f").unwrap()
-    }}
-}
-
 pub struct Profiler {
-
+	frames: Vec<Frame>,
+	program_start: Instant,
 }
 
 impl Profiler {
-	pub fn new() -> Self {
+	fn new() -> Self {
 		Self {
-
+			frames: Vec::new(),
+			program_start: Instant::now(),
 		}
 	}
 
 	pub fn new_frame(&mut self) {
-
+		self.frames.push(Frame::new());
 	}
 
-	pub fn submit_scope(&mut self, name: &String, start: Instant, duration: Duration) {
-		println!("{} took {}ms", name, duration.as_millis());
-    }
+	fn submit_scope(&mut self, name: String, start: Instant, duration: Duration) {
+		if self.frames.is_empty() {
+			self.frames.push(Frame::new());
+		}
+
+		self.frames.last_mut().unwrap().scopes.push(Scope { name, start, duration });
+	}
 }
 
 thread_local! {

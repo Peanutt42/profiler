@@ -1,5 +1,0 @@
-{
-	"rust-analyzer.linkedProjects": [
-		"./profiler-attributes/Cargo.toml"
-	]
-}
