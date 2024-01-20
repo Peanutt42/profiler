@@ -2,14 +2,16 @@ use profiler::{Profiler, new_frame, scope, custom_scope};
 use profiler_attributes::profile;
 
 #[profile]
-fn work() {
+fn work() -> i32 {
 	std::thread::sleep(std::time::Duration::from_millis(10));
+
+	5
 }
 
 #[test]
 fn simple() {
 	for _ in 0..10 {
-		work();
+		assert_eq!(work(), 5);
 
 		new_frame!();
 	}

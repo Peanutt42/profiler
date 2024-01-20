@@ -17,7 +17,7 @@ impl Scope {
 
 impl Drop for Scope {
 	fn drop(&mut self) {
-        PROFILER.with(|p| p.borrow_mut().submit_dynamic_scope(&self.name, self.start, self.start.elapsed()));
+        PROFILER.with(|p| p.borrow_mut().submit_scope(&self.name, self.start, self.start.elapsed()));
     }
 }
 
@@ -47,7 +47,7 @@ impl<'a> CustomScope<'a> {
 impl<'a> Drop for CustomScope<'a> {
 	fn drop(&mut self) {
 		let duration = self.start.elapsed();
-		self.profiler.submit_dynamic_scope(&self.name, self.start, duration);
+		self.profiler.submit_scope(&self.name, self.start, duration);
 	}
 }
 
@@ -85,11 +85,7 @@ impl Profiler {
 
 	}
 
-	pub fn submit_scope(&mut self, name: &str, start: Instant, duration: Duration) {
-		println!("{} took {}ms", name, duration.as_millis());
-    }
-
-	pub fn submit_dynamic_scope(&mut self, name: &String, start: Instant, duration: Duration) {
+	pub fn submit_scope(&mut self, name: &String, start: Instant, duration: Duration) {
 		println!("{} took {}ms", name, duration.as_millis());
     }
 }
