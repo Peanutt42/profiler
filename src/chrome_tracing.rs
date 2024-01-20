@@ -28,7 +28,7 @@ impl Profiler {
 				file.write(b"\"ph\":\"X\",")?;
 				file.write(b"\"pid\":0,")?;
 				file.write(b"\"tid\":0,")?;
-				file.write(format!("\"ts\":{}", profile_result.start.duration_since(self.program_start).as_micros()).as_bytes())?;
+				file.write(format!("\"ts\":{}", profile_result.start.as_micros()).as_bytes())?;
 				file.write(b"}")?;
 			}
 		}

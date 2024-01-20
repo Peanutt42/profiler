@@ -9,8 +9,10 @@ path = "src/lib.rs"
 
 [workspace]
 members = [
-	"profiler-attributes"
+	"profiler-attributes",
 ]
 
 [dependencies]
 profiler-attributes = { path = "profiler-attributes" }
+serde = { version = "1.0.195", features = ["derive"] }
+serde_yaml = "0.9.3"

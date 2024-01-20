@@ -1,8 +1,10 @@
 use std::time::{Instant, Duration};
 use std::cell::RefCell;
+use serde::{Serialize, Deserialize};
 
 mod chrome_tracing;
 mod function_name;
+mod serialization;
 
 #[derive(Clone)]
 pub struct Scope {
@@ -24,7 +26,7 @@ impl Drop for Scope {
 		let duration = self.start.elapsed();
 
         PROFILER.with(|p| {
-			p.borrow_mut().submit_profile_result(ProfileResult::new(self.name.clone(), self.start, duration));
+			p.borrow_mut().submit_profile_result(self.name.clone(), self.start, duration);
 		});
     }
 }
@@ -36,14 +38,15 @@ macro_rules! scope {
 	};
 }
 
-struct ProfileResult {
-	name: String,
-    start: Instant,
-    duration: Duration,
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProfileResult {
+	pub name: String,
+    pub start: Duration,
+    pub duration: Duration,
 }
 
 impl ProfileResult {
-	pub fn new(name: String, start: Instant, duration: Duration) -> Self {
+	pub fn new(name: String, start: Duration, duration: Duration) -> Self {
 		Self {
             name,
             start,
@@ -53,8 +56,9 @@ impl ProfileResult {
 }
 
 
-struct Frame {
-	profile_results: Vec<ProfileResult>,
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub struct Frame {
+	pub profile_results: Vec<ProfileResult>,
 }
 
 impl Frame {
@@ -66,12 +70,12 @@ impl Frame {
 }
 
 pub struct Profiler {
-	frames: Vec<Frame>,
+	pub frames: Vec<Frame>,
 	program_start: Instant,
 }
 
 impl Profiler {
-	fn new() -> Self {
+	pub fn new() -> Self {
 		Self {
 			frames: Vec::new(),
 			program_start: Instant::now(),
@@ -82,12 +86,12 @@ impl Profiler {
 		self.frames.push(Frame::new());
 	}
 
-	fn submit_profile_result(&mut self, profile_result: ProfileResult) {
+	fn submit_profile_result(&mut self, name: String, start: Instant, duration: Duration) {
 		if self.frames.is_empty() {
 			self.frames.push(Frame::new());
 		}
 
-		self.frames.last_mut().unwrap().profile_results.push(profile_result);
+		self.frames.last_mut().unwrap().profile_results.push(ProfileResult::new(name, start.duration_since(self.program_start), duration));
 	}
 }
 
