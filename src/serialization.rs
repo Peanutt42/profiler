@@ -1,58 +1,57 @@
-use crate::{Profiler,Frame};
+use crate::Profiler;
 use std::path::Path;
 use std::fs::File;
 use std::io::Write;
 
 impl Profiler {
-	pub fn from_yaml(&mut self, yaml: &String) {
-		let deserialized: serde_yaml::Result<Vec<Frame>> = serde_yaml::from_str(&yaml);
-		match deserialized {
-			Ok(frames) => {
-				self.frames = frames;
-			},
-			Err(e) => {
-				println!("Failed to parse YAML{}", e);
-			}
-		}
+	pub fn from_yaml(&mut self, yaml: &String) -> serde_yaml::Result<()> {
+		self.frames = serde_yaml::from_str(&yaml)?;
+
+		Ok(())
 	}
 
-	pub fn load_from_file(&mut self, filepath: &Path) {
+	pub fn load_from_file(&mut self, filepath: &Path) -> Result<(), String> {
 		match std::fs::read_to_string(filepath) {
 			Ok(yaml) => {
-				self.from_yaml(&yaml);
+				if let Err(e) = self.from_yaml(&yaml) {
+					return Err(e.to_string());
+				}
+				Ok(())
 			},
 			Err(e) => {
-				println!("Failed to read from file {}: {}", filepath.display(), e);
+				Err(e.to_string())
 			}
 		}
 	}
 
-	pub fn to_yaml(&self) -> String {
-		match serde_yaml::to_string(&self.frames) {
-			Ok(yaml) => {
-				yaml
-			},
-			Err(e) => {
-				panic!("Failed to serialize YAML: {}", e);
-			}
-		}
+	pub fn to_yaml(&self) -> serde_yaml::Result<String> {
+		serde_yaml::to_string(&self.frames)
 	}
 
-	pub fn save_to_file(&self, path: &Path) {
-		match File::create(path) {
-			Ok(mut file) => {
-				let _ = file.write_all(self.to_yaml().as_bytes());
-			},
-			Err(e) => {
-				println!("Failed to write to file {}: {}", path.display(), e);
-			}
+	pub fn save_to_file(&self, path: &Path) -> Result<(), String> {
+		let file = File::create(path);
+		if let Err(e) = file {
+			return Err(e.to_string());
 		}
+
+		let yaml = self.to_yaml();
+		if let Err(e) = yaml {
+			return Err(e.to_string());
+		}
+
+		if let Err(e) = file.unwrap().write_all(yaml.unwrap().as_bytes()) {
+			return Err(e.to_string());
+		}
+
+		Ok(())
 	}
 }
 
 #[macro_export]
 macro_rules! save_to_file {
 	($filepath:expr) => {
-		profiler::PROFILER.with(|p| p.borrow_mut().save_to_file($filepath));
+		if let Err(e) = profiler::PROFILER.with(|p| p.borrow_mut().save_to_file($filepath)) {
+			println!("Failed to write to file {}: {}", $filepath.display(), e);
+		}
 	};
 }

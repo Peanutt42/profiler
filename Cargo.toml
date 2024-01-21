@@ -10,6 +10,7 @@ path = "src/lib.rs"
 [workspace]
 members = [
 	"profiler-attributes",
+	"profiler-gui",
 ]
 
 [dependencies]
