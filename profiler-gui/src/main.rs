@@ -17,6 +17,21 @@ fn main() -> eframe::Result<()>{
 	let mut profiler: Option<ProcessedProfiler> = None;
 
 	eframe::run_simple_native("Profiler GUI", options, move |ctx, _frame| {
+		ctx.input(|i| {
+			for file in i.raw.dropped_files.iter() {
+				let mut loaded_profiler = Profiler::new();
+				if let Err(e) = loaded_profiler.load_from_file(Path::new(&file.path.clone().unwrap())) {
+					loading_error_msg = Some(e.to_string());
+					show_open_file_dialog = true;
+				}
+				else {
+					loading_error_msg = None;
+					profiler = Some(ProcessedProfiler::new(&loaded_profiler));
+					show_open_file_dialog = false;
+				}
+			}
+		});
+
 		egui::CentralPanel::default().show(ctx, |ui| {
 			if profiler.is_none() {
 				return;
@@ -64,6 +79,8 @@ fn main() -> eframe::Result<()>{
 				.anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
 				.show(ctx, |ui|
 			{
+				ui.label("Drag and drop a file or ...");
+
 				if ui.button("Load").clicked() {
 					if let Some(filepath) =  rfd::FileDialog::new().add_filter("YAML", &["yaml", "yml"]).pick_file() {
 						let mut loaded_profiler = Profiler::new();
