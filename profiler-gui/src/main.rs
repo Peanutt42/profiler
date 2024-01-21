@@ -39,22 +39,17 @@ fn main() -> eframe::Result<()>{
 
 				for frame in profiler.frames.iter() {
 					for profile_result in frame.profile_results.iter() {
-						let x = (profile_result.start.as_secs_f32() / total_time) * screen_width;
+						let x = profile_result.start.as_secs_f32() * screen_width / total_time;
 						let width = (profile_result.duration.as_secs_f32() / total_time) * screen_width;
-
+						
 						let rect_height = 20.0;
 						let rect = egui::Rect::from_min_size(egui::Pos2::new(x, profile_result.depth as f32 * rect_height), egui::Vec2::new(width, rect_height));
-						canvas.rect_filled(rect, 2.5, egui::Color32::BLUE);
+						canvas.rect(rect, 2.5, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
 
-						// Display function name as tooltip
-						if width > 30.0 {
-							canvas.text(
-								rect.center(),
-								egui::Align2::CENTER_CENTER,
-								&profile_result.name,
-								egui::TextStyle::Body.resolve(ui.style()),
-								egui::Color32::WHITE,
-							);
+						let font_color = egui::Color32::WHITE;
+						let text = canvas.layout_no_wrap(profile_result.name.clone(), egui::TextStyle::Body.resolve(ui.style()), font_color);
+						if text.rect.width() <= width {
+							canvas.galley(rect.center() - text.rect.size() / 2.0, text, font_color);
 						}
 					}
 				}
