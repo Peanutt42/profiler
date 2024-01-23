@@ -61,10 +61,8 @@ fn main() -> eframe::Result<()>{
 						let rect = egui::Rect::from_min_size(egui::Pos2::new(x, profile_result.depth as f32 * rect_height), egui::Vec2::new(width, rect_height));
 						canvas.rect(rect, 2.5, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
 
-						let font_color = egui::Color32::WHITE;
-						let text = canvas.layout_no_wrap(profile_result.name.clone(), egui::TextStyle::Body.resolve(ui.style()), font_color);
-						if text.rect.width() <= width {
-							canvas.galley(rect.center() - text.rect.size() / 2.0, text, font_color);
+						if width > 50.0 {
+							draw_truncated_text(&canvas, ui, &profile_result.name, width, rect.center());
 						}
 					}
 				}
@@ -103,4 +101,40 @@ fn main() -> eframe::Result<()>{
 			});
 		}
 	})
+}
+
+
+fn glyph_width(text: String, font_id: egui::FontId, canvas: &egui::Painter) -> f32 {
+	canvas.layout_no_wrap(text, font_id, egui::Color32::WHITE).rect.width()
+}
+fn glyph_char_width(c: char, font_id: egui::FontId, ui: &mut egui::Ui) -> f32 {
+	ui.fonts(|f| f.glyph_width(&font_id, c))
+}
+
+fn draw_truncated_text(painter: &egui::Painter, ui: &mut egui::Ui, text: &str, max_width: f32, pos: egui::Pos2) {
+	let font_id = egui::TextStyle::Body.resolve(ui.style());
+
+    let text_width = glyph_width(text.to_string(), font_id.clone(), painter);
+	
+	let truncated_text = if text_width > max_width {
+        let ellipsis_width = glyph_width("...".to_string(), font_id.clone(), painter);
+        let mut current_width = 0.0;
+        let mut truncated_length = 0;
+        for (i, char_width) in text.chars().map(|c| glyph_char_width(c, font_id.clone(), ui)).enumerate() {
+            current_width += char_width;
+            if current_width + ellipsis_width > max_width {
+                break;
+            }
+            truncated_length = i + 1;
+        }
+
+        let mut truncated_text = String::with_capacity(truncated_length + 3);
+        truncated_text.push_str(&text[..truncated_length]);
+        truncated_text.push_str("...");
+        truncated_text
+    } else {
+        text.to_owned()
+    };
+
+    painter.text(pos, egui::Align2::CENTER_CENTER, truncated_text, font_id, egui::Color32::WHITE);
 }
