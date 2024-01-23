@@ -13,10 +13,15 @@ fn main() -> eframe::Result<()>{
 
 	let mut show_open_file_dialog = true;
 	let mut loading_error_msg: Option<String> = None;
+	let mut offset: f32 = 0.0;
+	let mut zoom: f32 = 1.0;
+
+	let mut screen_width = 800.0;
 
 	let mut profiler: Option<ProcessedProfiler> = None;
 
 	eframe::run_simple_native("Profiler GUI", options, move |ctx, _frame| {
+		// drag and drop
 		ctx.input(|i| {
 			for file in i.raw.dropped_files.iter() {
 				let mut loaded_profiler = Profiler::new();
@@ -32,13 +37,36 @@ fn main() -> eframe::Result<()>{
 			}
 		});
 
+		// timeline input
+		ctx.input(|i| {
+			for e in i.events.iter() {
+				match e {
+					egui::Event::MouseWheel { unit: _, delta, modifiers: _ } => {
+						let factor = delta.y * 0.15 + 1.0;
+						zoom *= factor;
+						let mouse_pos = i.pointer.latest_pos().unwrap_or_default();
+						offset -= (mouse_pos.x - (screen_width / 2.0)) / zoom * ((1.0 / factor) - 1.0);
+					}
+					_ => {},
+				}
+			}
+
+			if i.pointer.primary_down() {
+				offset -= i.pointer.delta().x / zoom;
+			}
+			if i.pointer.secondary_down() {
+				// just zooms at the center
+				zoom *= i.pointer.delta().y * 0.005 + 1.0;
+			}
+		});
+
 		egui::CentralPanel::default().show(ctx, |ui| {
 			if profiler.is_none() {
 				return;
 			}
 
 			if let Some(profiler) = &profiler {
-				let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("profile_results")));
+				let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("profile_results")));
 				
 				let mut total_time = 0.0;
 				if !profiler.frames.is_empty() {
@@ -50,12 +78,14 @@ fn main() -> eframe::Result<()>{
 					}
 				}
 
-				let screen_width = ctx.screen_rect().width();
+				screen_width = ctx.screen_rect().width();
+				let center_x = screen_width / 2.0;
 
 				for frame in profiler.frames.iter() {
 					for profile_result in frame.profile_results.iter() {
-						let x = profile_result.start.as_secs_f32() * screen_width / total_time;
-						let width = (profile_result.duration.as_secs_f32() / total_time) * screen_width;
+						let x = (profile_result.start.as_secs_f32() * screen_width / total_time - offset) * zoom;
+						let x = center_x + (x);
+						let width = (profile_result.duration.as_secs_f32() / total_time) * screen_width * zoom;
 						
 						let rect_height = 20.0;
 						let rect = egui::Rect::from_min_size(egui::Pos2::new(x, profile_result.depth as f32 * rect_height), egui::Vec2::new(width, rect_height));
