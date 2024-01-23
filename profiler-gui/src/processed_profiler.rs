@@ -18,6 +18,7 @@ pub struct ProcessedFrame {
 
 #[derive(Clone)]
 pub struct ProcessedProfiler {
+	pub total_time: Duration,
 	pub frames: Vec<ProcessedFrame>,
 }
 
@@ -47,6 +48,14 @@ impl ProcessedProfiler {
 			);
 		}
 
-		Self { frames, }
+		let mut total_time = Duration::from_secs(0);
+		for profile_result in profiler.frames.last().unwrap().profile_results.iter() {
+			let end_time = profile_result.start + profile_result.duration;
+			if total_time < end_time {
+				total_time = end_time;
+			}
+		}
+
+		Self { total_time, frames }
 	}
 }
