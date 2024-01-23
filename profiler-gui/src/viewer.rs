@@ -26,6 +26,15 @@ impl Viewer {
         }
 	}
 
+	fn calc_pos(&self, x: f32) -> f32 {
+		if let Some(profiler) = &self.profiler {
+			self.screen_width / 2.0 + (x * self.screen_width / profiler.total_time.as_secs_f32() - self.offset) * self.zoom
+		}
+		else {
+			0.0
+		}
+	}
+
 	pub fn update(&mut self, ctx: &egui::Context) {
 		self.handle_drag_and_drop(ctx);
 
@@ -39,20 +48,21 @@ impl Viewer {
 			if let Some(profiler) = &self.profiler {
 				let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("profile_results")));
 
+				let timeline_height = self.draw_timeline(&canvas, ctx);
+
 				self.screen_width = ctx.screen_rect().width();
-				let center_x = self.screen_width / 2.0;
 				let height = 20.0;
 
 				for frame in profiler.frames.iter() {
-					let frame_start_pixel = center_x + (frame.start.as_secs_f32() * self.screen_width / profiler.total_time.as_secs_f32() - self.offset) * self.zoom;
-					let frame_end_pixel = center_x + ((frame.start + frame.duration).as_secs_f32() * self.screen_width / profiler.total_time.as_secs_f32() - self.offset) * self.zoom;
+					let frame_start_pixel = self.calc_pos(frame.start.as_secs_f32());
+					let frame_end_pixel = self.calc_pos((frame.start + frame.duration).as_secs_f32());
 					if frame_start_pixel > self.screen_width || frame_end_pixel < 0.0 {
 						continue;
 					}
 					
 					for profile_result in frame.profile_results.iter() {
-						let x = center_x + (profile_result.start.as_secs_f32() * self.screen_width / profiler.total_time.as_secs_f32() - self.offset) * self.zoom;
-						let y = profile_result.depth as f32 * height;
+						let x = self.calc_pos(profile_result.start.as_secs_f32());
+						let y = profile_result.depth as f32 * height + timeline_height;
 						let width = (profile_result.duration.as_secs_f32() / profiler.total_time.as_secs_f32()) * self.screen_width * self.zoom;
 						
 						let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
@@ -81,6 +91,36 @@ impl Viewer {
 		if self.show_open_file_dialog {
 			self.open_file_dialog(ctx);
 		}
+	}
+
+	// returns the height of the timeline
+	fn draw_timeline(&self, canvas: &egui::Painter, ctx: &egui::Context) -> f32 {
+		if self.profiler.is_none() || self.profiler.as_ref().unwrap().frames.is_empty() {
+			return 0.0;
+		}
+
+		let profiler = self.profiler.as_ref().unwrap();
+		
+		let height = 25.0;
+		let screen_width = ctx.screen_rect().width();
+
+		// start      0             width    end
+		//  |         #################        |
+		let start = self.calc_pos(0.0);
+		let end = self.calc_pos(profiler.total_time.as_secs_f32());
+
+		let left_percentage = (0.0 - start) / (end - start);
+		let right_percentage = (screen_width - start) / (end - start);
+		let view_start = left_percentage * screen_width;
+		let view_end = right_percentage * screen_width;
+
+		canvas.rect_filled(egui::Rect::from_min_max(egui::Pos2::new(view_start, 0.0), egui::Pos2::new(view_end, height)), 0.0, egui::Color32::WHITE);
+
+		for frame in profiler.frames.iter() {
+			canvas.rect(egui::Rect::from_min_size(egui::Pos2::new((frame.start.as_secs_f32() / profiler.total_time.as_secs_f32()) * screen_width, 0.0), egui::Vec2::new(1.0, height)), 0.0, egui::Color32::GRAY, egui::Stroke::new(1.0, egui::Color32::BLACK));
+		}
+
+		height
 	}
 
 	fn handle_input(&mut self, ctx: &egui::Context) {
