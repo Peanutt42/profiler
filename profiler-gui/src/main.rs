@@ -87,6 +87,12 @@ fn main() -> eframe::Result<()>{
 				let height = 20.0;
 
 				for frame in profiler.frames.iter() {
+					let frame_start_pixel = center_x + (frame.start.as_secs_f32() * screen_width / total_time - offset) * zoom;
+					let frame_end_pixel = center_x + ((frame.start + frame.duration).as_secs_f32() * screen_width / total_time - offset) * zoom;
+					if frame_start_pixel > screen_width || frame_end_pixel < 0.0 {
+						continue;
+					}
+					
 					for profile_result in frame.profile_results.iter() {
 						let x = center_x + (profile_result.start.as_secs_f32() * screen_width / total_time - offset) * zoom;
 						let y = profile_result.depth as f32 * height;

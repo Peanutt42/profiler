@@ -24,11 +24,12 @@ impl Profiler {
 		}
 	}
 
-	pub fn to_yaml(&self) -> serde_yaml::Result<String> {
+	pub fn to_yaml(&mut self) -> serde_yaml::Result<String> {
+		self.finish_last_frame();
 		serde_yaml::to_string(&self.frames)
 	}
 
-	pub fn save_to_file(&self, path: &Path) -> Result<(), String> {
+	pub fn save_to_file(&mut self, path: &Path) -> Result<(), String> {
 		let file = File::create(path);
 		if let Err(e) = file {
 			return Err(e.to_string());

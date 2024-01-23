@@ -16,7 +16,7 @@ fn serialization_test() {
 		}
 	}
 
-	let yaml = PROFILER.with(|p| p.borrow().to_yaml());
+	let yaml = PROFILER.with(|p| p.borrow_mut().to_yaml());
 	let mut new_profiler = Profiler::new();
 	new_profiler.from_yaml(&yaml.expect("failed to generate yaml from profiler")).expect("failed to parse yaml for profiler");
 	assert_eq!(new_profiler.frames.len(), 10);

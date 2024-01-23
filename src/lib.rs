@@ -58,12 +58,16 @@ impl ProfileResult {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Frame {
+	pub start: Duration,
+	pub duration: Duration,
 	pub profile_results: Vec<ProfileResult>,
 }
 
 impl Frame {
-	fn new() -> Self {
+	fn new(program_start: &Instant) -> Self {
 		Self {
+			start: Instant::now().duration_since(*program_start),
+			duration: Duration::from_secs(0),
 			profile_results: Vec::new(),
 		}
 	}
@@ -83,12 +87,19 @@ impl Profiler {
 	}
 
 	pub fn new_frame(&mut self) {
-		self.frames.push(Frame::new());
+		self.finish_last_frame();
+		self.frames.push(Frame::new(&self.program_start));
+	}
+
+	pub fn finish_last_frame(&mut self) {
+		if let Some(last_frame) = self.frames.last_mut() {
+			last_frame.duration = std::time::Instant::now().duration_since(self.program_start) - last_frame.start;
+		}
 	}
 
 	fn submit_profile_result(&mut self, name: String, start: Instant, duration: Duration) {
 		if self.frames.is_empty() {
-			self.frames.push(Frame::new());
+			self.frames.push(Frame::new(&self.program_start));
 		}
 
 		self.frames.last_mut().unwrap().profile_results.push(ProfileResult::new(name, start.duration_since(self.program_start), duration));
