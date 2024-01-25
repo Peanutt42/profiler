@@ -1,5 +1,5 @@
-# profiler-rs
- simple instrumentation profiler
+# profiler
+simple rust instrumentation profiler
 ```rust
 #[profile]
 fn work_1() {

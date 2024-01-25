@@ -1,9 +1,9 @@
 [package]
-name = "profiler-gui"
+name = "profiler_gui"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-profiler-rs = { path = "../" }
+profiler = { path = "../" }
 eframe = "0.25"
 rfd = "0.13"
