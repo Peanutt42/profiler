@@ -106,6 +106,12 @@ impl Profiler {
 	}
 }
 
+impl Default for Profiler {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 thread_local! {
 	pub static PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
 }

@@ -21,15 +21,15 @@ impl Profiler {
 	fn write_chrome_tracing_profile_results(&self, file: &mut File) -> std::io::Result<()> {
 		for frame in self.frames.iter() {
 			for profile_result in frame.profile_results.iter() {
-				file.write(b",{")?;
-				file.write(b"\"cat\":\"function\",")?;
-				file.write(format!("\"dur\":{},", profile_result.duration.as_micros()).as_bytes())?;
-				file.write(format!("\"name\":\"{}\",", profile_result.name).as_bytes())?;
-				file.write(b"\"ph\":\"X\",")?;
-				file.write(b"\"pid\":0,")?;
-				file.write(b"\"tid\":0,")?;
-				file.write(format!("\"ts\":{}", profile_result.start.as_micros()).as_bytes())?;
-				file.write(b"}")?;
+				file.write_all(b",{")?;
+				file.write_all(b"\"cat\":\"function\",")?;
+				file.write_all(format!("\"dur\":{},", profile_result.duration.as_micros()).as_bytes())?;
+				file.write_all(format!("\"name\":\"{}\",", profile_result.name).as_bytes())?;
+				file.write_all(b"\"ph\":\"X\",")?;
+				file.write_all(b"\"pid\":0,")?;
+				file.write_all(b"\"tid\":0,")?;
+				file.write_all(format!("\"ts\":{}", profile_result.start.as_micros()).as_bytes())?;
+				file.write_all(b"}")?;
 			}
 		}
 
@@ -37,11 +37,11 @@ impl Profiler {
 	}
 
 	fn write_chrome_tracing_json(&self, file: &mut File) -> std::io::Result<()>{
-		file.write(b"{\"otherData\":{},\"traceEvents\":[{}")?;
+		file.write_all(b"{\"otherData\":{},\"traceEvents\":[{}")?;
 
 		self.write_chrome_tracing_profile_results(file)?;
 
-		file.write(b"]}")?;
+		file.write_all(b"]}")?;
 
 		file.flush()?;
 

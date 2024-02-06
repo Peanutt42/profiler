@@ -130,13 +130,10 @@ impl Viewer {
 			}
 
 			for e in i.events.iter() {
-				match e {
-					egui::Event::MouseWheel { unit: _, delta, modifiers: _ } => {
-						let factor = delta.y * 0.15 + 1.0;
-						self.zoom *= factor;
-						self.offset -= (self.mouse_pos.x - (self.screen_width / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
-					}
-					_ => {},
+				if let egui::Event::MouseWheel { unit: _, delta, modifiers: _ } = e {
+					let factor = delta.y * 0.15 + 1.0;
+					self.zoom *= factor;
+					self.offset -= (self.mouse_pos.x - (self.screen_width / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
 				}
 			}
 
@@ -180,7 +177,7 @@ impl Viewer {
 				if ui.button("Load").clicked() {
 					if let Some(filepath) =  rfd::FileDialog::new().add_filter("YAML", &["yaml", "yml"]).pick_file() {
 						let mut loaded_profiler = Profiler::new();
-						if let Err(e) = loaded_profiler.load_from_file(&Path::new(&filepath)) {
+						if let Err(e) = loaded_profiler.load_from_file(Path::new(&filepath)) {
 							self.loading_error_msg = Some(e);
 						}
 						else {

@@ -4,8 +4,8 @@ use std::fs::File;
 use std::io::Write;
 
 impl Profiler {
-	pub fn from_yaml(&mut self, yaml: &String) -> serde_yaml::Result<()> {
-		self.frames = serde_yaml::from_str(&yaml)?;
+	pub fn from_yaml(&mut self, yaml: &str) -> serde_yaml::Result<()> {
+		self.frames = serde_yaml::from_str(yaml)?;
 
 		Ok(())
 	}
