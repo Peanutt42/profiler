@@ -28,9 +28,13 @@ impl ProcessedProfiler {
 
 		for frame in profiler.frames.iter() {
 			let mut profile_results: Vec<ProcessedProfileResult> = Vec::new();
-			for profile_result in frame.profile_results.iter() {
+			for (i, profile_result) in frame.profile_results.iter().enumerate() {
 				let mut depth = 0;
-				for other_profile_result in frame.profile_results.iter() {
+				for (j, other_profile_result) in frame.profile_results.iter().enumerate() {
+					if i == j {
+						continue;
+					}
+					
 					if profile_result.start >= other_profile_result.start && (profile_result.start + profile_result.duration) <= (other_profile_result.start + other_profile_result.duration) {
 						depth += 1;
 					}
