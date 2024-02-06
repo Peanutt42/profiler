@@ -49,9 +49,12 @@ impl Viewer {
 				let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("profile_results")));
 
 				let timeline_height = self.draw_timeline(&canvas, ctx);
+				let padding = 10.0;
 
 				self.screen_width = ctx.screen_rect().width();
-				let height = 20.0;
+				let height = 28.0;
+
+				let mut selection_rect: Option<egui::Rect> = None;
 
 				for frame in profiler.frames.iter() {
 					let frame_start_pixel = self.calc_pos(frame.start.as_secs_f32());
@@ -62,7 +65,7 @@ impl Viewer {
 					
 					for profile_result in frame.profile_results.iter() {
 						let x = self.calc_pos(profile_result.start.as_secs_f32());
-						let y = profile_result.depth as f32 * height + timeline_height;
+						let y = profile_result.depth as f32 * height + timeline_height + padding;
 						let width = (profile_result.duration.as_secs_f32() / profiler.total_time.as_secs_f32()) * self.screen_width * self.zoom;
 						
 						let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
@@ -78,12 +81,22 @@ impl Viewer {
 						else {
 							allow_tooltip = true;
 						}
-						if allow_tooltip && self.mouse_pos.x >= x && self.mouse_pos.y >= y && self.mouse_pos.y <= y + height && self.mouse_pos.x <= x + width {
-							egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
-								ui.label(&profile_result.name);
-							});
+						
+						let hovered: bool = self.mouse_pos.x >= x && self.mouse_pos.y >= y && self.mouse_pos.y <= y + height && self.mouse_pos.x <= x + width;
+						if hovered {
+							let hover_rect_offset = 3.0;
+							selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
+							
+							if allow_tooltip {
+								egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
+									ui.label(&profile_result.name);
+								});
+							}
 						}
 					}
+				}
+				if let Some(selection_rect) = selection_rect {
+					canvas.rect_stroke(selection_rect, 2.5, egui::Stroke::new(1.5, egui::Color32::YELLOW));
 				}
 			}
 		});
@@ -101,7 +114,7 @@ impl Viewer {
 
 		let profiler = self.profiler.as_ref().unwrap();
 		
-		let height = 25.0;
+		let height = 15.0;
 		let screen_width = ctx.screen_rect().width();
 
 		// start      0             width    end
@@ -166,34 +179,34 @@ impl Viewer {
 
 	fn open_file_dialog(&mut self, ctx: &egui::Context) {
 		egui::Window::new("Open saved profiling record")
-				.default_size([300.0, 150.0])
-				.collapsible(false)
-				.movable(false)
-				.anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-				.show(ctx, |ui|
-			{
-				ui.label("Drag and drop a file or ...");
+			.default_size([300.0, 150.0])
+			.collapsible(false)
+			.movable(false)
+			.anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+			.show(ctx, |ui|
+		{
+			ui.label("Drag and drop a file or ...");
 
-				if ui.button("Load").clicked() {
-					if let Some(filepath) =  rfd::FileDialog::new().add_filter("YAML", &["yaml", "yml"]).pick_file() {
-						let mut loaded_profiler = Profiler::new();
-						if let Err(e) = loaded_profiler.load_from_file(Path::new(&filepath)) {
-							self.loading_error_msg = Some(e);
-						}
-						else {
-							self.loading_error_msg = None;
-							self.profiler = Some(ProcessedProfiler::new(&loaded_profiler));
-							self.show_open_file_dialog = false;
-						}
+			if ui.button("Load").clicked() {
+				if let Some(filepath) =  rfd::FileDialog::new().add_filter("YAML", &["yaml", "yml"]).pick_file() {
+					let mut loaded_profiler = Profiler::new();
+					if let Err(e) = loaded_profiler.load_from_file(Path::new(&filepath)) {
+						self.loading_error_msg = Some(e);
+					}
+					else {
+						self.loading_error_msg = None;
+						self.profiler = Some(ProcessedProfiler::new(&loaded_profiler));
+						self.show_open_file_dialog = false;
 					}
 				}
+			}
 
-				if let Some(error) = self.loading_error_msg.clone() {
-					ui.visuals_mut().override_text_color = Some(egui::Color32::RED);
+			if let Some(error) = self.loading_error_msg.clone() {
+				ui.visuals_mut().override_text_color = Some(egui::Color32::RED);
 
-					ui.label(&error);
-				}
-			});
+				ui.label(&error);
+			}
+		});
 	}
 
 
@@ -210,7 +223,7 @@ impl Viewer {
 
 		let text_width = Self::glyph_width(text.to_string(), font_id.clone(), painter);
 		
-		let truncated_text = if text_width > max_width {
+		if text_width > max_width {
 			let ellipsis_width = Self::glyph_width("...".to_string(), font_id.clone(), painter);
 			let mut current_width = 0.0;
 			let mut truncated_length = 0;
@@ -225,13 +238,11 @@ impl Viewer {
 			let mut truncated_text = String::with_capacity(truncated_length + 3);
 			truncated_text.push_str(&text[..truncated_length]);
 			truncated_text.push_str("...");
-			truncated_text
+			painter.text(pos, egui::Align2::CENTER_CENTER, truncated_text, font_id, egui::Color32::WHITE);
+			false
 		} else {
-			text.to_owned()
-		};
-
-		painter.text(pos, egui::Align2::CENTER_CENTER, truncated_text, font_id, egui::Color32::WHITE);
-
-		text_width > max_width
+			painter.text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
+			true
+		}
 	}
 }
