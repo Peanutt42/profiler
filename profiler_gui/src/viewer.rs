@@ -10,6 +10,8 @@ pub struct Viewer {
 	loading_error_msg: Option<String>,
 	view_start: f64,
 	view_end: f64,
+	smooth_view_start: f64,
+	smooth_view_end: f64,
 	offset_y: f64,
 	screen_width: f64,
 	screen_height: f64,
@@ -24,6 +26,8 @@ impl Viewer {
             loading_error_msg: None,
             view_start: 0.0,
             view_end: 1.0,
+            smooth_view_start: 0.0,
+            smooth_view_end: 1.0,
             offset_y: 0.0,
             screen_width: 800.0,
             screen_height: 600.0,
@@ -35,7 +39,7 @@ impl Viewer {
 	fn calc_pos_x(&self, x: f64) -> f64 {
 		if let Some(profiler) = &self.profiler {
 			let relative_pos = x / profiler.total_time.as_secs_f64();
-			(self.view_start * (1.0 - relative_pos) + self.view_end * relative_pos) * self.screen_width
+			(self.smooth_view_start * (1.0 - relative_pos) + self.smooth_view_end * relative_pos) * self.screen_width
 		}
 		else {
 			0.0
@@ -181,10 +185,18 @@ impl Viewer {
 				self.offset_y -= mouse_delta.y as f64;
 			}
 			if i.pointer.secondary_down() {
-				self.zoom(-0.01 * i.pointer.delta().y as f64, zoom_target);
+				self.zoom(-0.005 * i.pointer.delta().y as f64, zoom_target);
 			}
 		});
 
+		let smooth_start_difference = self.view_start - self.smooth_view_start;
+		let smooth_end_difference = self.view_end - self.smooth_view_end;
+		if smooth_start_difference.abs() > 0.01 || smooth_end_difference.abs() > 0.01 {
+			ctx.request_repaint();
+		}
+		let stable_dt = ctx.input(|i| i.stable_dt as f64);
+		self.smooth_view_start += smooth_start_difference * 7.5 * stable_dt;
+		self.smooth_view_end += smooth_end_difference * 7.5 * stable_dt;
 		self.offset_y = self.offset_y.max(0.0);
 	}
 
@@ -202,7 +214,6 @@ impl Viewer {
 		else {
 			self.loading_error_msg = None;
 			self.profiler = Some(ProcessedProfiler::new(loaded_profiler));
-			//self.offset_x = self.screen_width / 2.0;
 			self.view_start  = 0.0;
 			self.view_end = 1.0;
 			self.offset_y = 0.0;
