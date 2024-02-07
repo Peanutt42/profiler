@@ -3,13 +3,16 @@ use crate::ProcessedProfiler;
 use profiler::Profiler;
 use std::{path::Path, time::Duration};
 
+const TIMELINE_HEIGHT: f64 = 15.0;
+
 pub struct Viewer {
 	show_open_file_dialog: bool,
 	loading_error_msg: Option<String>,
-	offset: f32,
-	zoom: f32,
-	screen_width: f32,
-	screen_height: f32,
+	offset_x: f64,
+	offset_y: f64,
+	zoom: f64,
+	screen_width: f64,
+	screen_height: f64,
 	mouse_pos: egui::Pos2,
 	profiler: Option<ProcessedProfiler>,
 }
@@ -19,8 +22,9 @@ impl Viewer {
 		Viewer {
             show_open_file_dialog: true,
             loading_error_msg: None,
-            offset: 0.0,
-            zoom: 1.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+			zoom: 1.0,
             screen_width: 800.0,
             screen_height: 600.0,
             mouse_pos: egui::Pos2::new(0.0, 0.0),
@@ -28,9 +32,9 @@ impl Viewer {
         }
 	}
 
-	fn calc_pos(&self, x: f32) -> f32 {
+	fn calc_pos_x(&self, x: f64) -> f64 {
 		if let Some(profiler) = &self.profiler {
-			self.screen_width / 2.0 + (x * self.screen_width / profiler.total_time.as_secs_f32() - self.offset) * self.zoom
+			self.screen_width / 2.0 + (x * self.screen_width / profiler.total_time.as_secs_f64() - self.offset_x) * self.zoom
 		}
 		else {
 			0.0
@@ -50,39 +54,38 @@ impl Viewer {
 
 			let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("profile_results")));
 
-			let timeline_height = self.draw_timeline(&canvas, ctx);
 			let padding = 10.0;
-
-			self.screen_width = ctx.screen_rect().width();
-			self.screen_height = ctx.screen_rect().height();
-			let height = 28.0;
+			
+			self.screen_width = ctx.screen_rect().width() as f64;
+			self.screen_height = ctx.screen_rect().height() as f64;
 			let rounding = 2.5;
+			let function_height = 28.0;
 			let hover_rect_offset = 1.0;
-
+			
 			let mut selection_rect: Option<egui::Rect> = None;
-
+			
 			for frame in profiler.frames.iter() {
-				let frame_start_pixel = self.calc_pos(frame.start.as_secs_f32());
-				let frame_end_pixel = self.calc_pos((frame.start + frame.duration).as_secs_f32());
+				let frame_start_pixel = self.calc_pos_x(frame.start.as_secs_f64());
+				let frame_end_pixel = self.calc_pos_x((frame.start + frame.duration).as_secs_f64());
 				if frame_start_pixel > self.screen_width || frame_end_pixel < 0.0 {
 					continue;
 				}
 				
 				for profile_result in frame.profile_results.iter() {
-					let x = self.calc_pos(profile_result.start.as_secs_f32());
-					let y = profile_result.depth as f32 * height + timeline_height + padding;
-					let width = (profile_result.duration.as_secs_f32() / profiler.total_time.as_secs_f32()) * self.screen_width * self.zoom;
+					let width = (profile_result.duration.as_secs_f64() / profiler.total_time.as_secs_f64()) * self.screen_width * self.zoom;
+					let x = self.calc_pos_x(profile_result.start.as_secs_f64());
+					let y = profile_result.depth as f64 * function_height + TIMELINE_HEIGHT + padding - self.offset_y;
 					
-					if x > self.screen_width || x + width < 0.0 || y + height > self.screen_height {
+					if x > self.screen_width || x + width < 0.0 || y > self.screen_height {
 						continue;
 					}
-
-					let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
+					
+					let rect = egui::Rect::from_min_size(egui::Pos2::new(x as f32, y as f32), egui::Vec2::new(width as f32, function_height as f32));
 					canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
-
+					
 					let mut show_name_tooltip = false;
 					if width > 50.0 {
-						let truncated = draw_truncated_text(&canvas, ui, &profile_result.name, width, rect.center());
+						let truncated = draw_truncated_text(&canvas, ui, &profile_result.name, width as f32, rect.center());
 						if truncated {
 							show_name_tooltip = true;
 						}
@@ -91,7 +94,7 @@ impl Viewer {
 						show_name_tooltip = true;
 					}
 					
-					let hovered: bool = self.mouse_pos.x >= x && self.mouse_pos.y >= y && self.mouse_pos.y <= y + height && self.mouse_pos.x <= x + width;
+					let hovered: bool = self.mouse_pos.x as f64 >= x && self.mouse_pos.y as f64 >= y && self.mouse_pos.y as f64 <= y + function_height && self.mouse_pos.x as f64 <= x + width;
 					if hovered {
 						selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
 						
@@ -107,41 +110,39 @@ impl Viewer {
 			if let Some(selection_rect) = selection_rect {
 				canvas.rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
 			}
-		});
 
+			self.draw_timeline(&canvas, ctx);
+		});		
+		
 		if self.show_open_file_dialog {
 			self.open_file_dialog(ctx);
 		}
 	}
 
-	// returns the height of the timeline
-	fn draw_timeline(&self, canvas: &egui::Painter, ctx: &egui::Context) -> f32 {
+	fn draw_timeline(&self, canvas: &egui::Painter, ctx: &egui::Context) {
 		if self.profiler.is_none() || self.profiler.as_ref().unwrap().frames.is_empty() {
-			return 0.0;
+			return;
 		}
 
 		let profiler = self.profiler.as_ref().unwrap();
 		
-		let height = 15.0;
-		let screen_width = ctx.screen_rect().width();
+		let screen_width = ctx.screen_rect().width() as f64;
 
 		// start      0             width    end
 		//  |         #################        |
-		let start = self.calc_pos(0.0);
-		let end = self.calc_pos(profiler.total_time.as_secs_f32());
+		let start = self.calc_pos_x(0.0);
+		let end = self.calc_pos_x(profiler.total_time.as_secs_f64());
 
 		let left_percentage = (0.0 - start) / (end - start);
 		let right_percentage = (screen_width - start) / (end - start);
 		let view_start = left_percentage * screen_width;
 		let view_end = right_percentage * screen_width;
 
-		canvas.rect_filled(egui::Rect::from_min_max(egui::Pos2::new(view_start, 0.0), egui::Pos2::new(view_end, height)), 0.0, egui::Color32::WHITE);
+		canvas.rect_filled(egui::Rect::from_min_max(egui::Pos2::new(view_start as f32, 0.0), egui::Pos2::new(view_end as f32, TIMELINE_HEIGHT as f32)), 0.0, egui::Color32::WHITE);
 
 		for frame in profiler.frames.iter() {
-			canvas.rect(egui::Rect::from_min_size(egui::Pos2::new((frame.start.as_secs_f32() / profiler.total_time.as_secs_f32()) * screen_width, 0.0), egui::Vec2::new(1.0, height)), 0.0, egui::Color32::GRAY, egui::Stroke::new(1.0, egui::Color32::BLACK));
+			canvas.rect(egui::Rect::from_min_size(egui::Pos2::new((frame.start.as_secs_f64() / profiler.total_time.as_secs_f64()) as f32 * screen_width as f32, 0.0), egui::Vec2::new(1.0, TIMELINE_HEIGHT as f32)), 0.0, egui::Color32::GRAY, egui::Stroke::new(1.0, egui::Color32::BLACK));
 		}
-
-		height
 	}
 
 	fn handle_input(&mut self, ctx: &egui::Context) {
@@ -152,20 +153,25 @@ impl Viewer {
 
 			for e in i.events.iter() {
 				if let egui::Event::MouseWheel { unit: _, delta, modifiers: _ } = e {
-					let factor = delta.y * 0.15 + 1.0;
+					let factor = delta.y as f64 * 0.15 + 1.0;
 					self.zoom *= factor;
-					self.offset -= (self.mouse_pos.x - (self.screen_width / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
+					self.offset_x -= (self.mouse_pos.x as f64 - (self.screen_width / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
+					//self.offset_y -= (self.mouse_pos.y - (self.screen_height / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
 				}
 			}
 
 			if i.pointer.primary_down() {
-				self.offset -= i.pointer.delta().x / self.zoom;
+				let mouse_delta = i.pointer.delta();
+				self.offset_x -= mouse_delta.x as f64 / self.zoom;
+				self.offset_y -= mouse_delta.y as f64;
 			}
 			if i.pointer.secondary_down() {
 				// just zooms at the center
-				self.zoom *= i.pointer.delta().y * 0.005 + 1.0;
+				self.zoom *= i.pointer.delta().y as f64 * 0.005 + 1.0;
 			}
 		});
+
+		self.offset_y = self.offset_y.max(0.0);
 	}
 
 	fn load_profiler(&mut self, filepath: &Path) {
@@ -177,7 +183,8 @@ impl Viewer {
 		else {
 			self.loading_error_msg = None;
 			self.profiler = Some(ProcessedProfiler::new(&loaded_profiler));
-			self.offset = self.screen_width / 2.0;
+			self.offset_x = self.screen_width / 2.0;
+			self.offset_y = 0.0;
 			self.show_open_file_dialog = false;
 		}
 	}
