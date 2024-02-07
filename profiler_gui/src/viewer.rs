@@ -272,21 +272,17 @@ fn draw_truncated_text(painter: &egui::Painter, ui: &mut egui::Ui, text: &str, m
 	let text_width = glyph_width(text.to_string(), font_id.clone(), painter);
 	
 	if text_width > max_width {
-		let ellipsis_width = glyph_width("...".to_string(), font_id.clone(), painter);
 		let mut current_width = 0.0;
 		let mut truncated_length = 0;
 		for (i, char_width) in text.chars().map(|c| glyph_char_width(c, font_id.clone(), ui)).enumerate() {
 			current_width += char_width;
-			if current_width + ellipsis_width > max_width {
+			if current_width > max_width {
 				break;
 			}
 			truncated_length = i + 1;
 		}
 
-		let mut truncated_text = String::with_capacity(truncated_length + 3);
-		truncated_text.push_str(&text[..truncated_length]);
-		truncated_text.push_str("...");
-		painter.text(pos, egui::Align2::CENTER_CENTER, truncated_text, font_id, egui::Color32::WHITE);
+		painter.text(pos, egui::Align2::CENTER_CENTER, &text[..truncated_length], font_id, egui::Color32::WHITE);
 		true
 	} else {
 		painter.text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
