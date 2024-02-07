@@ -53,6 +53,8 @@ impl Viewer {
 
 				self.screen_width = ctx.screen_rect().width();
 				let height = 28.0;
+				let rounding = 2.5;
+				let hover_rect_offset = 1.0;
 
 				let mut selection_rect: Option<egui::Rect> = None;
 
@@ -69,7 +71,7 @@ impl Viewer {
 						let width = (profile_result.duration.as_secs_f32() / profiler.total_time.as_secs_f32()) * self.screen_width * self.zoom;
 						
 						let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
-						canvas.rect(rect, 2.5, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
+						canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
 
 						let mut allow_tooltip = false;
 						if width > 50.0 {
@@ -84,7 +86,6 @@ impl Viewer {
 						
 						let hovered: bool = self.mouse_pos.x >= x && self.mouse_pos.y >= y && self.mouse_pos.y <= y + height && self.mouse_pos.x <= x + width;
 						if hovered {
-							let hover_rect_offset = 3.0;
 							selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
 							
 							if allow_tooltip {
@@ -96,7 +97,7 @@ impl Viewer {
 					}
 				}
 				if let Some(selection_rect) = selection_rect {
-					canvas.rect_stroke(selection_rect, 2.5, egui::Stroke::new(1.5, egui::Color32::YELLOW));
+					canvas.rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
 				}
 			}
 		});
@@ -239,10 +240,10 @@ impl Viewer {
 			truncated_text.push_str(&text[..truncated_length]);
 			truncated_text.push_str("...");
 			painter.text(pos, egui::Align2::CENTER_CENTER, truncated_text, font_id, egui::Color32::WHITE);
-			false
+			true
 		} else {
 			painter.text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
-			true
+			false
 		}
 	}
 }
