@@ -44,61 +44,60 @@ impl Viewer {
 			if self.profiler.is_none() {
 				return;
 			}
+			let profiler = self.profiler.as_ref().unwrap();
 
-			if let Some(profiler) = &self.profiler {
-				let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("profile_results")));
+			let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("profile_results")));
 
-				let timeline_height = self.draw_timeline(&canvas, ctx);
-				let padding = 10.0;
+			let timeline_height = self.draw_timeline(&canvas, ctx);
+			let padding = 10.0;
 
-				self.screen_width = ctx.screen_rect().width();
-				let height = 28.0;
-				let rounding = 2.5;
-				let hover_rect_offset = 1.0;
+			self.screen_width = ctx.screen_rect().width();
+			let height = 28.0;
+			let rounding = 2.5;
+			let hover_rect_offset = 1.0;
 
-				let mut selection_rect: Option<egui::Rect> = None;
+			let mut selection_rect: Option<egui::Rect> = None;
 
-				for frame in profiler.frames.iter() {
-					let frame_start_pixel = self.calc_pos(frame.start.as_secs_f32());
-					let frame_end_pixel = self.calc_pos((frame.start + frame.duration).as_secs_f32());
-					if frame_start_pixel > self.screen_width || frame_end_pixel < 0.0 {
-						continue;
-					}
+			for frame in profiler.frames.iter() {
+				let frame_start_pixel = self.calc_pos(frame.start.as_secs_f32());
+				let frame_end_pixel = self.calc_pos((frame.start + frame.duration).as_secs_f32());
+				if frame_start_pixel > self.screen_width || frame_end_pixel < 0.0 {
+					continue;
+				}
+				
+				for profile_result in frame.profile_results.iter() {
+					let x = self.calc_pos(profile_result.start.as_secs_f32());
+					let y = profile_result.depth as f32 * height + timeline_height + padding;
+					let width = (profile_result.duration.as_secs_f32() / profiler.total_time.as_secs_f32()) * self.screen_width * self.zoom;
 					
-					for profile_result in frame.profile_results.iter() {
-						let x = self.calc_pos(profile_result.start.as_secs_f32());
-						let y = profile_result.depth as f32 * height + timeline_height + padding;
-						let width = (profile_result.duration.as_secs_f32() / profiler.total_time.as_secs_f32()) * self.screen_width * self.zoom;
-						
-						let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
-						canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
+					let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
+					canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
 
-						let mut allow_tooltip = false;
-						if width > 50.0 {
-							let truncated = Self::draw_truncated_text(&canvas, ui, &profile_result.name, width, rect.center());
-							if truncated {
-                                allow_tooltip = true;
-                            }
-						}
-						else {
+					let mut allow_tooltip = false;
+					if width > 50.0 {
+						let truncated = Self::draw_truncated_text(&canvas, ui, &profile_result.name, width, rect.center());
+						if truncated {
 							allow_tooltip = true;
 						}
+					}
+					else {
+						allow_tooltip = true;
+					}
+					
+					let hovered: bool = self.mouse_pos.x >= x && self.mouse_pos.y >= y && self.mouse_pos.y <= y + height && self.mouse_pos.x <= x + width;
+					if hovered {
+						selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
 						
-						let hovered: bool = self.mouse_pos.x >= x && self.mouse_pos.y >= y && self.mouse_pos.y <= y + height && self.mouse_pos.x <= x + width;
-						if hovered {
-							selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
-							
-							if allow_tooltip {
-								egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
-									ui.label(&profile_result.name);
-								});
-							}
+						if allow_tooltip {
+							egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
+								ui.label(&profile_result.name);
+							});
 						}
 					}
 				}
-				if let Some(selection_rect) = selection_rect {
-					canvas.rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
-				}
+			}
+			if let Some(selection_rect) = selection_rect {
+				canvas.rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
 			}
 		});
 
@@ -161,19 +160,24 @@ impl Viewer {
 		});
 	}
 
+	fn load_profiler(&mut self, filepath: &Path) {
+		let mut loaded_profiler = Profiler::new();
+		if let Err(e) = loaded_profiler.load_from_file(filepath) {
+			self.loading_error_msg = Some(e.to_string());
+			self.show_open_file_dialog = true;
+		}
+		else {
+			self.loading_error_msg = None;
+			self.profiler = Some(ProcessedProfiler::new(&loaded_profiler));
+			self.offset = self.screen_width / 2.0;
+			self.show_open_file_dialog = false;
+		}
+	}
+
 	fn handle_drag_and_drop(&mut self, ctx: &egui::Context) {
 		ctx.input(|i| {
 			for file in i.raw.dropped_files.iter() {
-				let mut loaded_profiler = Profiler::new();
-				if let Err(e) = loaded_profiler.load_from_file(Path::new(&file.path.clone().unwrap())) {
-					self.loading_error_msg = Some(e.to_string());
-					self.show_open_file_dialog = true;
-				}
-				else {
-					self.loading_error_msg = None;
-					self.profiler = Some(ProcessedProfiler::new(&loaded_profiler));
-					self.show_open_file_dialog = false;
-				}
+				self.load_profiler(file.path.as_ref().unwrap());
 			}
 		});
 	}
@@ -190,15 +194,7 @@ impl Viewer {
 
 			if ui.button("Load").clicked() {
 				if let Some(filepath) =  rfd::FileDialog::new().add_filter("YAML", &["yaml", "yml"]).pick_file() {
-					let mut loaded_profiler = Profiler::new();
-					if let Err(e) = loaded_profiler.load_from_file(Path::new(&filepath)) {
-						self.loading_error_msg = Some(e);
-					}
-					else {
-						self.loading_error_msg = None;
-						self.profiler = Some(ProcessedProfiler::new(&loaded_profiler));
-						self.show_open_file_dialog = false;
-					}
+					self.load_profiler(&filepath);
 				}
 			}
 
