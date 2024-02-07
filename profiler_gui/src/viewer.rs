@@ -71,7 +71,7 @@ impl Viewer {
 					continue;
 				}
 				
-				for profile_result in frame.profile_results.iter() {
+				for (i, profile_result) in frame.profile_results.iter().enumerate() {
 					let width = (profile_result.duration.as_secs_f64() / profiler.total_time.as_secs_f64()) * self.screen_width * self.zoom;
 					let x = self.calc_pos_x(profile_result.start.as_secs_f64());
 					let y = profile_result.depth as f64 * function_height + TIMELINE_HEIGHT + padding - self.offset_y;
@@ -103,7 +103,18 @@ impl Viewer {
 								ui.label(&profile_result.name);
 							}
 							ui.label(format!("Duration: {}", format_duration(&profile_result.duration)));
-							ui.label(format!("Self Duration: {}", format_duration(&profile_result.self_duration)));
+
+							let mut self_duration = profile_result.duration;
+							for j in 0..frame.profile_results.len() {
+								if i == j {
+									continue;
+								}
+			
+								if profile_result.depth + 1 == frame.profile_results[j].depth && frame.profile_results[j].is_inside(profile_result) {
+									self_duration -= frame.profile_results[j].duration;
+								}
+							}
+							ui.label(format!("Self Duration: {}", format_duration(&self_duration)));
 						});
 					}
 				}

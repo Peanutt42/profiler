@@ -62,7 +62,7 @@ impl ProfileResult {
 	}
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Frame {
 	pub start: Duration,
 	pub duration: Duration,
