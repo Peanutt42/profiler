@@ -9,6 +9,7 @@ pub struct Viewer {
 	offset: f32,
 	zoom: f32,
 	screen_width: f32,
+	screen_height: f32,
 	mouse_pos: egui::Pos2,
 	profiler: Option<ProcessedProfiler>,
 }
@@ -21,6 +22,7 @@ impl Viewer {
             offset: 0.0,
             zoom: 1.0,
             screen_width: 800.0,
+            screen_height: 600.0,
             mouse_pos: egui::Pos2::new(0.0, 0.0),
             profiler: None,
         }
@@ -52,6 +54,7 @@ impl Viewer {
 			let padding = 10.0;
 
 			self.screen_width = ctx.screen_rect().width();
+			self.screen_height = ctx.screen_rect().height();
 			let height = 28.0;
 			let rounding = 2.5;
 			let hover_rect_offset = 1.0;
@@ -70,6 +73,10 @@ impl Viewer {
 					let y = profile_result.depth as f32 * height + timeline_height + padding;
 					let width = (profile_result.duration.as_secs_f32() / profiler.total_time.as_secs_f32()) * self.screen_width * self.zoom;
 					
+					if x > self.screen_width || x + width < 0.0 || y + height > self.screen_height {
+						continue;
+					}
+
 					let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
 					canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
 
