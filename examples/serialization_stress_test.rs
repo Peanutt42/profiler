@@ -25,13 +25,10 @@ fn work_2(depth: usize) {
 }
 
 fn main() {
-	for i in 0..10000 {
+	for i in 0..2000 {
 		new_frame!();
 
 		scope!(format!("frame_{i}"));
-
-		// just so frame_x and work_1 don't overlap, just ignore, not really needed
-		//std::thread::sleep(std::time::Duration::from_nanos(1));
 
 		work_1(100);
 		work_2(100);

@@ -32,29 +32,26 @@ pub struct ProcessedProfiler {
 }
 
 impl ProcessedProfiler {
-	pub fn new(profiler: &Profiler) -> Self {
+	pub fn new(profiler: Profiler) -> Self {
 		let mut frames = Vec::with_capacity(profiler.frames.len());
 
-		for frame in profiler.frames.iter() {
-			let mut profile_results: Vec<ProcessedProfileResult> = Vec::new();
-			for (i, profile_result) in frame.profile_results.iter().enumerate() {
-				let mut depth = 0;
-				for (j, other_profile_result) in frame.profile_results.iter().enumerate() {
-					if i == j {
-						continue;
-					}
-					
-					if profile_result.is_inside(other_profile_result) {
-						depth += 1;
-					}
-				}
+		let mut total_time = Duration::from_secs(0);
+		for profile_result in profiler.frames.last().unwrap().profile_results.iter() {
+			let end_time = profile_result.start + profile_result.duration;
+			if total_time < end_time {
+				total_time = end_time;
+			}
+		}
 
+		for frame in profiler.frames {
+			let mut profile_results: Vec<ProcessedProfileResult> = Vec::new();
+			for profile_result in frame.profile_results {
 				profile_results.push(ProcessedProfileResult {
-					name: profile_result.name.clone(),
+					name: profile_result.name,
 					start: profile_result.start,
 					duration: profile_result.duration,
 					self_duration: profile_result.duration,
-					depth
+					depth: profile_result.depth,
 				});
 			}
 
@@ -69,7 +66,7 @@ impl ProcessedProfiler {
 						profile_results[i].self_duration -= non_self_duration;
 					}
 				}
-			}	
+			}
 
 			frames.push(
 				ProcessedFrame {
@@ -78,14 +75,6 @@ impl ProcessedProfiler {
 					profile_results,
                 }
 			);
-		}
-
-		let mut total_time = Duration::from_secs(0);
-		for profile_result in profiler.frames.last().unwrap().profile_results.iter() {
-			let end_time = profile_result.start + profile_result.duration;
-			if total_time < end_time {
-				total_time = end_time;
-			}
 		}
 
 		Self { total_time, frames }

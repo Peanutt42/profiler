@@ -14,6 +14,7 @@ pub struct Scope {
 
 impl Scope {
 	pub fn new(name: String) -> Self {
+		PROFILER.with_borrow_mut(|p| p.begin_profile_result());
 		Self {
 			name,
 			start: Instant::now(),
@@ -25,9 +26,7 @@ impl Drop for Scope {
 	fn drop(&mut self) {
 		let duration = self.start.elapsed();
 
-        PROFILER.with(|p| {
-			p.borrow_mut().submit_profile_result(self.name.clone(), self.start, duration);
-		});
+        PROFILER.with_borrow_mut(|p| p.submit_profile_result(self.name.clone(), self.start, duration));
     }
 }
 
@@ -43,14 +42,16 @@ pub struct ProfileResult {
 	pub name: String,
     pub start: Duration,
     pub duration: Duration,
+	pub depth: usize,
 }
 
 impl ProfileResult {
-	pub fn new(name: String, start: Duration, duration: Duration) -> Self {
+	pub fn new(name: String, start: Duration, duration: Duration, depth: usize) -> Self {
 		Self {
             name,
             start,
             duration,
+			depth,
         }
 	}
 	
@@ -80,6 +81,7 @@ impl Frame {
 
 pub struct Profiler {
 	pub frames: Vec<Frame>,
+	current_frame_call_depth: usize,
 	program_start: Instant,
 }
 
@@ -87,6 +89,7 @@ impl Profiler {
 	pub fn new() -> Self {
 		Self {
 			frames: Vec::new(),
+			current_frame_call_depth: 0,
 			program_start: Instant::now(),
 		}
 	}
@@ -94,6 +97,7 @@ impl Profiler {
 	pub fn new_frame(&mut self) {
 		self.finish_last_frame();
 		self.frames.push(Frame::new(&self.program_start));
+		assert!(self.current_frame_call_depth == 0);
 	}
 
 	pub fn finish_last_frame(&mut self) {
@@ -102,12 +106,17 @@ impl Profiler {
 		}
 	}
 
+	fn begin_profile_result(&mut self) {
+		self.current_frame_call_depth += 1;
+	}
+
 	fn submit_profile_result(&mut self, name: String, start: Instant, duration: Duration) {
 		if self.frames.is_empty() {
 			self.frames.push(Frame::new(&self.program_start));
 		}
 
-		self.frames.last_mut().unwrap().profile_results.push(ProfileResult::new(name, start.duration_since(self.program_start), duration));
+		self.frames.last_mut().unwrap().profile_results.push(ProfileResult::new(name, start.duration_since(self.program_start), duration, self.current_frame_call_depth - 1));
+		self.current_frame_call_depth -= 1;
 	}
 }
 

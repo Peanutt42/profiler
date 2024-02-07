@@ -182,7 +182,7 @@ impl Viewer {
 		}
 		else {
 			self.loading_error_msg = None;
-			self.profiler = Some(ProcessedProfiler::new(&loaded_profiler));
+			self.profiler = Some(ProcessedProfiler::new(loaded_profiler));
 			self.offset_x = self.screen_width / 2.0;
 			self.offset_y = 0.0;
 			self.show_open_file_dialog = false;
