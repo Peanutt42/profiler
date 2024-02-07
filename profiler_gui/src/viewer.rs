@@ -1,7 +1,7 @@
 use eframe::egui;
 use crate::ProcessedProfiler;
 use profiler::Profiler;
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 pub struct Viewer {
 	show_open_file_dialog: bool,
@@ -73,26 +73,27 @@ impl Viewer {
 					let rect = egui::Rect::from_min_size(egui::Pos2::new(x, y), egui::Vec2::new(width, height));
 					canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
 
-					let mut allow_tooltip = false;
+					let mut show_name_tooltip = false;
 					if width > 50.0 {
-						let truncated = Self::draw_truncated_text(&canvas, ui, &profile_result.name, width, rect.center());
+						let truncated = draw_truncated_text(&canvas, ui, &profile_result.name, width, rect.center());
 						if truncated {
-							allow_tooltip = true;
+							show_name_tooltip = true;
 						}
 					}
 					else {
-						allow_tooltip = true;
+						show_name_tooltip = true;
 					}
 					
 					let hovered: bool = self.mouse_pos.x >= x && self.mouse_pos.y >= y && self.mouse_pos.y <= y + height && self.mouse_pos.x <= x + width;
 					if hovered {
 						selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
 						
-						if allow_tooltip {
-							egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
+						egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
+							if show_name_tooltip {
 								ui.label(&profile_result.name);
-							});
-						}
+							}
+							ui.label(format!("Duration: {}", format_duration(&profile_result.duration)));
+						});
 					}
 				}
 			}
@@ -205,41 +206,65 @@ impl Viewer {
 			}
 		});
 	}
+}
 
+fn format_duration(duration: &Duration) -> String {
+	const NANOS_PER_SEC: f32 = 1_000_000_000.0;
+	const NANOS_PER_MILLI: f32 = 1_000_000.0;
+	const NANOS_PER_MICRO: f32 = 1_000.0;
+	const MILLIS_PER_SEC: f32 = 1_000.0;
+	const MICROS_PER_SEC: f32 = 1_000_000.0;
 
-	fn glyph_width(text: String, font_id: egui::FontId, canvas: &egui::Painter) -> f32 {
-		canvas.layout_no_wrap(text, font_id, egui::Color32::WHITE).rect.width()
+	let secs = duration.as_secs() as f32;
+	let nanos = duration.subsec_nanos() as f32;
+	let secs_f32 = secs + nanos / NANOS_PER_SEC;
+	if secs_f32 >= 0.1 {
+		return format!("{secs} s");
 	}
-	fn glyph_char_width(c: char, font_id: egui::FontId, ui: &mut egui::Ui) -> f32 {
-		ui.fonts(|f| f.glyph_width(&font_id, c))
+	let millis = secs * MILLIS_PER_SEC + nanos / NANOS_PER_MILLI;
+	if millis >= 0.1 {
+		return format!("{millis} ms");
 	}
+	let micros = secs * MICROS_PER_SEC + nanos / NANOS_PER_MICRO;
+	if micros >= 0.1 {
+		return format!("{micros} us");
+	}
+	let nanos = secs * NANOS_PER_SEC + nanos;
+	format!("{nanos} ns")
+}
 
-	// returns wheter the text was truncated
-	fn draw_truncated_text(painter: &egui::Painter, ui: &mut egui::Ui, text: &str, max_width: f32, pos: egui::Pos2) -> bool {
-		let font_id = egui::TextStyle::Body.resolve(ui.style());
+fn glyph_width(text: String, font_id: egui::FontId, canvas: &egui::Painter) -> f32 {
+	canvas.layout_no_wrap(text, font_id, egui::Color32::WHITE).rect.width()
+}
+fn glyph_char_width(c: char, font_id: egui::FontId, ui: &mut egui::Ui) -> f32 {
+	ui.fonts(|f| f.glyph_width(&font_id, c))
+}
 
-		let text_width = Self::glyph_width(text.to_string(), font_id.clone(), painter);
-		
-		if text_width > max_width {
-			let ellipsis_width = Self::glyph_width("...".to_string(), font_id.clone(), painter);
-			let mut current_width = 0.0;
-			let mut truncated_length = 0;
-			for (i, char_width) in text.chars().map(|c| Self::glyph_char_width(c, font_id.clone(), ui)).enumerate() {
-				current_width += char_width;
-				if current_width + ellipsis_width > max_width {
-					break;
-				}
-				truncated_length = i + 1;
+// returns wheter the text was truncated
+fn draw_truncated_text(painter: &egui::Painter, ui: &mut egui::Ui, text: &str, max_width: f32, pos: egui::Pos2) -> bool {
+	let font_id = egui::TextStyle::Body.resolve(ui.style());
+
+	let text_width = glyph_width(text.to_string(), font_id.clone(), painter);
+	
+	if text_width > max_width {
+		let ellipsis_width = glyph_width("...".to_string(), font_id.clone(), painter);
+		let mut current_width = 0.0;
+		let mut truncated_length = 0;
+		for (i, char_width) in text.chars().map(|c| glyph_char_width(c, font_id.clone(), ui)).enumerate() {
+			current_width += char_width;
+			if current_width + ellipsis_width > max_width {
+				break;
 			}
-
-			let mut truncated_text = String::with_capacity(truncated_length + 3);
-			truncated_text.push_str(&text[..truncated_length]);
-			truncated_text.push_str("...");
-			painter.text(pos, egui::Align2::CENTER_CENTER, truncated_text, font_id, egui::Color32::WHITE);
-			true
-		} else {
-			painter.text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
-			false
+			truncated_length = i + 1;
 		}
+
+		let mut truncated_text = String::with_capacity(truncated_length + 3);
+		truncated_text.push_str(&text[..truncated_length]);
+		truncated_text.push_str("...");
+		painter.text(pos, egui::Align2::CENTER_CENTER, truncated_text, font_id, egui::Color32::WHITE);
+		true
+	} else {
+		painter.text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
+		false
 	}
 }
