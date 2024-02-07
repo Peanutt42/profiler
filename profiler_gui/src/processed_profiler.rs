@@ -6,7 +6,16 @@ pub struct ProcessedProfileResult {
 	pub name: String,
 	pub start: Duration,
     pub duration: Duration,
+    pub self_duration: Duration,
 	pub depth: usize,
+}
+
+impl ProcessedProfileResult {
+	fn is_inside(&self, other: &Self) -> bool {
+		let self_end = self.start + self.duration;
+		let other_end = other.start + other.duration;
+		self.start >= other.start && self_end <= other_end
+	}
 }
 
 #[derive(Clone)]
@@ -35,13 +44,32 @@ impl ProcessedProfiler {
 						continue;
 					}
 					
-					if profile_result.start >= other_profile_result.start && (profile_result.start + profile_result.duration) <= (other_profile_result.start + other_profile_result.duration) {
+					if profile_result.is_inside(other_profile_result) {
 						depth += 1;
 					}
 				}
 
-				profile_results.push(ProcessedProfileResult { name: profile_result.name.clone(), start: profile_result.start, duration: profile_result.duration, depth });
+				profile_results.push(ProcessedProfileResult {
+					name: profile_result.name.clone(),
+					start: profile_result.start,
+					duration: profile_result.duration,
+					self_duration: profile_result.duration,
+					depth
+				});
 			}
+
+			for i in 0..profile_results.len() {
+				for j in 0..profile_results.len() {
+					if i == j {
+						continue;
+					}
+
+					if profile_results[i].depth + 1 == profile_results[j].depth && profile_results[j].is_inside(&profile_results[i]) {
+						let non_self_duration = profile_results[j].duration;
+						profile_results[i].self_duration -= non_self_duration;
+					}
+				}
+			}	
 
 			frames.push(
 				ProcessedFrame {

@@ -103,6 +103,7 @@ impl Viewer {
 								ui.label(&profile_result.name);
 							}
 							ui.label(format!("Duration: {}", format_duration(&profile_result.duration)));
+							ui.label(format!("Self Duration: {}", format_duration(&profile_result.self_duration)));
 						});
 					}
 				}
@@ -156,7 +157,6 @@ impl Viewer {
 					let factor = delta.y as f64 * 0.15 + 1.0;
 					self.zoom *= factor;
 					self.offset_x -= (self.mouse_pos.x as f64 - (self.screen_width / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
-					//self.offset_y -= (self.mouse_pos.y - (self.screen_height / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
 				}
 			}
 
@@ -233,7 +233,7 @@ fn format_duration(duration: &Duration) -> String {
 	let nanos = duration.subsec_nanos() as f32;
 	let secs_f32 = secs + nanos / NANOS_PER_SEC;
 	if secs_f32 >= 0.1 {
-		return format!("{secs} s");
+		return format!("{secs_f32} s");
 	}
 	let millis = secs * MILLIS_PER_SEC + nanos / NANOS_PER_MILLI;
 	if millis >= 0.1 {

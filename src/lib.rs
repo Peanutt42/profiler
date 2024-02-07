@@ -53,8 +53,13 @@ impl ProfileResult {
             duration,
         }
 	}
+	
+	pub fn is_inside(&self, other: &Self) -> bool {
+		let self_end = self.start + self.duration;
+		let other_end = other.start + other.duration;
+		self.start >= other.start && self_end <= other_end
+	}
 }
-
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Frame {
