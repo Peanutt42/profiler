@@ -8,9 +8,9 @@ const TIMELINE_HEIGHT: f64 = 15.0;
 pub struct Viewer {
 	show_open_file_dialog: bool,
 	loading_error_msg: Option<String>,
-	offset_x: f64,
+	view_start: f64,
+	view_end: f64,
 	offset_y: f64,
-	zoom: f64,
 	screen_width: f64,
 	screen_height: f64,
 	mouse_pos: egui::Pos2,
@@ -22,9 +22,9 @@ impl Viewer {
 		Viewer {
             show_open_file_dialog: true,
             loading_error_msg: None,
-            offset_x: 0.0,
+            view_start: 0.0,
+            view_end: 1.0,
             offset_y: 0.0,
-			zoom: 1.0,
             screen_width: 800.0,
             screen_height: 600.0,
             mouse_pos: egui::Pos2::new(0.0, 0.0),
@@ -34,7 +34,8 @@ impl Viewer {
 
 	fn calc_pos_x(&self, x: f64) -> f64 {
 		if let Some(profiler) = &self.profiler {
-			self.screen_width / 2.0 + (x * self.screen_width / profiler.total_time.as_secs_f64() - self.offset_x) * self.zoom
+			let relative_pos = x / profiler.total_time.as_secs_f64();
+			(self.view_start * (1.0 - relative_pos) + self.view_end * relative_pos) * self.screen_width
 		}
 		else {
 			0.0
@@ -72,9 +73,9 @@ impl Viewer {
 				}
 				
 				for (i, profile_result) in frame.profile_results.iter().enumerate() {
-					let width = (profile_result.duration.as_secs_f64() / profiler.total_time.as_secs_f64()) * self.screen_width * self.zoom;
 					let x = self.calc_pos_x(profile_result.start.as_secs_f64());
 					let y = profile_result.depth as f64 * function_height + TIMELINE_HEIGHT + padding - self.offset_y;
+					let width = self.calc_pos_x((profile_result.start + profile_result.duration).as_secs_f64()) - x;
 					
 					if x > self.screen_width || x + width < 0.0 || y > self.screen_height {
 						continue;
@@ -163,26 +164,33 @@ impl Viewer {
 				self.mouse_pos = pos;
 			}
 
+			// 0.0..1.0 inside the current view
+			let mouse_pos_relative_to_view = ((self.mouse_pos.x as f64 / self.screen_width) - self.view_start) / (self.view_end - self.view_start);
+			let zoom_target = self.view_start + (self.view_end - self.view_start) * mouse_pos_relative_to_view;
+					
 			for e in i.events.iter() {
 				if let egui::Event::MouseWheel { unit: _, delta, modifiers: _ } = e {
-					let factor = delta.y as f64 * 0.15 + 1.0;
-					self.zoom *= factor;
-					self.offset_x -= (self.mouse_pos.x as f64 - (self.screen_width / 2.0)) / self.zoom * ((1.0 / factor) - 1.0);
+					self.zoom(-0.1 * delta.y as f64, zoom_target);
 				}
 			}
 
 			if i.pointer.primary_down() {
 				let mouse_delta = i.pointer.delta();
-				self.offset_x -= mouse_delta.x as f64 / self.zoom;
+				self.view_start += mouse_delta.x as f64 / self.screen_width;
+				self.view_end += mouse_delta.x as f64 / self.screen_width;
 				self.offset_y -= mouse_delta.y as f64;
 			}
 			if i.pointer.secondary_down() {
-				// just zooms at the center
-				self.zoom *= i.pointer.delta().y as f64 * 0.005 + 1.0;
+				self.zoom(-0.01 * i.pointer.delta().y as f64, zoom_target);
 			}
 		});
 
 		self.offset_y = self.offset_y.max(0.0);
+	}
+
+	fn zoom(&mut self, amount: f64, zoom_target: f64) {
+		self.view_start += (zoom_target - self.view_start) * amount;
+		self.view_end -= (self.view_end - zoom_target) * amount;
 	}
 
 	fn load_profiler(&mut self, filepath: &Path) {
@@ -194,7 +202,9 @@ impl Viewer {
 		else {
 			self.loading_error_msg = None;
 			self.profiler = Some(ProcessedProfiler::new(loaded_profiler));
-			self.offset_x = self.screen_width / 2.0;
+			//self.offset_x = self.screen_width / 2.0;
+			self.view_start  = 0.0;
+			self.view_end = 1.0;
 			self.offset_y = 0.0;
 			self.show_open_file_dialog = false;
 		}
