@@ -194,7 +194,7 @@ impl Viewer {
 			ui.label("Drag and drop a file or ...");
 
 			if ui.button("Load").clicked() {
-				if let Some(filepath) =  rfd::FileDialog::new().add_filter("YAML", &["yaml", "yml"]).pick_file() {
+				if let Some(filepath) =  rfd::FileDialog::new().add_filter("Profiling", &["profiling"]).pick_file() {
 					self.load_profiler(&filepath);
 				}
 			}

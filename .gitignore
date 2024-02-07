@@ -15,4 +15,4 @@ Cargo.lock
 
 # saved profiling results
 chrome_tracing.json
-saved.yaml
+saved.profiling

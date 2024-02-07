@@ -21,7 +21,7 @@ fn main() {
 		work_2();
 	}
 
-	save_to_file!(&Path::new("saved.yaml"));
+	save_to_file!(&Path::new("saved.profiling"));
 }
 ```
 ![alt text](screenshot.png)

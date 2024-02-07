@@ -1,49 +1,31 @@
 use crate::Profiler;
+use anyhow::Result;
 use std::path::Path;
 use std::fs::File;
 use std::io::Write;
 
 impl Profiler {
-	pub fn from_yaml(&mut self, yaml: &str) -> serde_yaml::Result<()> {
-		self.frames = serde_yaml::from_str(yaml)?;
+	pub fn from_binary(&mut self, bytes: &[u8]) -> bincode::Result<()> {
+		self.frames = bincode::deserialize(bytes)?;
 
 		Ok(())
 	}
 
-	pub fn load_from_file(&mut self, filepath: &Path) -> Result<(), String> {
-		match std::fs::read_to_string(filepath) {
-			Ok(yaml) => {
-				if let Err(e) = self.from_yaml(&yaml) {
-					return Err(e.to_string());
-				}
-				Ok(())
-			},
-			Err(e) => {
-				Err(e.to_string())
-			}
-		}
+	pub fn load_from_file(&mut self, filepath: &Path) -> Result<()> {
+		let bytes = std::fs::read(filepath)?;
+		self.from_binary(&bytes)?;
+		Ok(())
 	}
 
-	pub fn to_yaml(&mut self) -> serde_yaml::Result<String> {
+	pub fn to_binary(&mut self) -> bincode::Result<Vec<u8>> {
 		self.finish_last_frame();
-		serde_yaml::to_string(&self.frames)
+		bincode::serialize(&self.frames)
 	}
 
-	pub fn save_to_file(&mut self, path: &Path) -> Result<(), String> {
-		let file = File::create(path);
-		if let Err(e) = file {
-			return Err(e.to_string());
-		}
-
-		let yaml = self.to_yaml();
-		if let Err(e) = yaml {
-			return Err(e.to_string());
-		}
-
-		if let Err(e) = file.unwrap().write_all(yaml.unwrap().as_bytes()) {
-			return Err(e.to_string());
-		}
-
+	pub fn save_to_file(&mut self, path: &Path) -> Result<()> {
+		let mut file = File::create(path)?;
+		let bytes = self.to_binary()?;
+		file.write_all(&bytes)?;
 		Ok(())
 	}
 }
