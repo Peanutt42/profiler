@@ -47,6 +47,9 @@ impl Viewer {
 	}
 
 	pub fn update(&mut self, ctx: &egui::Context) {
+		// disable reactive mode
+		ctx.request_repaint();
+
 		self.handle_drag_and_drop(ctx);
 
 		self.handle_input(ctx);
@@ -189,18 +192,37 @@ impl Viewer {
 			}
 		});
 
-		let smooth_start_difference = self.view_start - self.smooth_view_start;
-		let smooth_end_difference = self.view_end - self.smooth_view_end;
-		if smooth_start_difference.abs() > 0.01 || smooth_end_difference.abs() > 0.01 {
-			ctx.request_repaint();
+		let dt = ctx.input(|i| i.unstable_dt as f64);
+		// if the profiler has too low fps, just snap to target view
+		if dt < 1.0 / 15.0 {
+			let smooth_start_difference = self.view_start - self.smooth_view_start;
+			let smooth_end_difference = self.view_end - self.smooth_view_end;
+			if smooth_start_difference.abs() < 0.01 || smooth_end_difference.abs() < 0.01 {
+				self.smooth_view_start = self.view_start;
+				self.smooth_view_end = self.view_end;
+			}
+			self.smooth_view_start += smooth_start_difference * 15.0 * dt;
+			self.smooth_view_end += smooth_end_difference * 15.0 * dt;
 		}
-		let stable_dt = ctx.input(|i| i.stable_dt as f64);
-		self.smooth_view_start += smooth_start_difference * 7.5 * stable_dt;
-		self.smooth_view_end += smooth_end_difference * 7.5 * stable_dt;
+		else {
+			self.smooth_view_start = self.view_start;
+            self.smooth_view_end = self.view_end;
+		}
+
+		if self.view_start >= self.view_end {
+			self.view_start = 0.0;
+			self.smooth_view_start = 0.0;
+			self.view_end  = 1.0;
+			self.smooth_view_end = 1.0;
+		}
+
 		self.offset_y = self.offset_y.max(0.0);
 	}
 
-	fn zoom(&mut self, amount: f64, zoom_target: f64) {
+	fn zoom(&mut self, mut amount: f64, zoom_target: f64) {
+		if amount > 0.9 {
+			amount = 0.9;
+		}
 		self.view_start += (zoom_target - self.view_start) * amount;
 		self.view_end -= (self.view_end - zoom_target) * amount;
 	}
