@@ -2,7 +2,6 @@ use std::time::{Instant, Duration};
 use std::cell::RefCell;
 use serde::{Serialize, Deserialize};
 
-mod chrome_tracing;
 mod function_name;
 mod serialization;
 

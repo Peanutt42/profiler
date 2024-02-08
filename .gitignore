@@ -14,5 +14,4 @@ Cargo.lock
 *.pdb
 
 # saved profiling results
-chrome_tracing.json
 saved.profiling
