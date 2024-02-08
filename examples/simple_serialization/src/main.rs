@@ -1,6 +1,5 @@
 use profiler::{new_frame, scope, save_to_file};
 use profiler_attributes::profile;
-use std::path::Path;
 
 #[profile]
 fn work_1() {
@@ -26,5 +25,5 @@ fn main() {
 		work_2();
 	}
 
-	save_to_file!(&Path::new("saved.profiling"));
+	save_to_file!("saved.profiling");
 }

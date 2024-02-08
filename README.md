@@ -21,7 +21,7 @@ fn main() {
         work_2();
     }
 
-    save_to_file!(&Path::new("saved.profiling"));
+    save_to_file!("saved.profiling");
 }
 ```
 ![alt text](screenshot.png)

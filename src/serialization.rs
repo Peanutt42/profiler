@@ -22,7 +22,9 @@ impl Profiler {
 		bincode::serialize(&self.frames)
 	}
 
-	pub fn save_to_file(&mut self, path: &Path) -> Result<()> {
+	pub fn save_to_file<P>(&mut self, path: P) -> Result<()>
+	where P: AsRef<Path>
+	{
 		let mut file = File::create(path)?;
 		let bytes = self.to_binary()?;
 		file.write_all(&bytes)?;
@@ -35,7 +37,7 @@ impl Profiler {
 macro_rules! save_to_file {
 	($filepath:expr) => {
 		if let Err(e) = profiler::PROFILER.with_borrow_mut(|p| p.save_to_file($filepath)) {
-			println!("Failed to write to file {}: {}", $filepath.display(), e);
+			eprintln!("Failed to write to file {}: {}", $filepath, e);
 		}
 	};
 }
