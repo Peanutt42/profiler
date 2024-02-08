@@ -10,8 +10,8 @@ pub struct ProcessedProfiler {
 impl ProcessedProfiler {
 	pub fn new(profiler: Profiler) -> Self {
 		let mut total_time = Duration::from_secs(0);
-		for profile_result in profiler.frames.last().unwrap().profile_results.iter() {
-			let end_time = profile_result.start + profile_result.duration;
+		for scope_result in profiler.frames.last().unwrap().scope_results.iter() {
+			let end_time = scope_result.start + scope_result.duration;
 			if total_time < end_time {
 				total_time = end_time;
 			}

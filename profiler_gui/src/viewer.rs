@@ -1,7 +1,8 @@
 use eframe::egui;
-use crate::ProcessedProfiler;
 use profiler::Profiler;
 use std::{path::Path, time::Duration};
+use crate::ProcessedProfiler;
+use crate::utils::draw_truncated_text;
 
 const TIMELINE_HEIGHT: f64 = 15.0;
 
@@ -60,7 +61,7 @@ impl Viewer {
 			}
 			let profiler = self.profiler.as_ref().unwrap();
 
-			let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("profile_results")));
+			let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("scope_results")));
 
 			let padding = 10.0;
 			
@@ -79,10 +80,10 @@ impl Viewer {
 					continue;
 				}
 				
-				for (i, profile_result) in frame.profile_results.iter().enumerate() {
-					let x = self.calc_pos_x(profile_result.start.as_secs_f64());
-					let y = profile_result.depth as f64 * function_height + TIMELINE_HEIGHT + padding - self.offset_y;
-					let width = self.calc_pos_x((profile_result.start + profile_result.duration).as_secs_f64()) - x;
+				for (i, scope_result) in frame.scope_results.iter().enumerate() {
+					let x = self.calc_pos_x(scope_result.start.as_secs_f64());
+					let y = scope_result.depth as f64 * function_height + TIMELINE_HEIGHT + padding - self.offset_y;
+					let width = self.calc_pos_x((scope_result.start + scope_result.duration).as_secs_f64()) - x;
 					
 					if x > self.screen_width || x + width < 0.0 || y > self.screen_height {
 						continue;
@@ -93,7 +94,7 @@ impl Viewer {
 					
 					let mut show_name_tooltip = false;
 					if width > 50.0 {
-						let truncated = draw_truncated_text(&canvas, ui, &profile_result.name, width as f32, rect.center());
+						let truncated = draw_truncated_text(&canvas, ui, &scope_result.name, width as f32, rect.center());
 						if truncated {
 							show_name_tooltip = true;
 						}
@@ -108,18 +109,18 @@ impl Viewer {
 						
 						egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
 							if show_name_tooltip {
-								ui.label(&profile_result.name);
+								ui.label(&scope_result.name);
 							}
-							ui.label(format!("Duration: {}", format_duration(&profile_result.duration)));
+							ui.label(format!("Duration: {}", format_duration(&scope_result.duration)));
 
-							let mut self_duration = profile_result.duration;
-							for j in 0..frame.profile_results.len() {
+							let mut self_duration = scope_result.duration;
+							for j in 0..frame.scope_results.len() {
 								if i == j {
 									continue;
 								}
 			
-								if profile_result.depth + 1 == frame.profile_results[j].depth && frame.profile_results[j].is_inside(profile_result) {
-									self_duration -= frame.profile_results[j].duration;
+								if scope_result.depth + 1 == frame.scope_results[j].depth && frame.scope_results[j].is_inside(scope_result) {
+									self_duration -= frame.scope_results[j].duration;
 								}
 							}
 							ui.label(format!("Self Duration: {}", format_duration(&self_duration)));
@@ -299,36 +300,4 @@ fn format_duration(duration: &Duration) -> String {
 	}
 	let nanos = secs * NANOS_PER_SEC + nanos;
 	format!("{nanos} ns")
-}
-
-fn glyph_width(text: String, font_id: egui::FontId, canvas: &egui::Painter) -> f32 {
-	canvas.layout_no_wrap(text, font_id, egui::Color32::WHITE).rect.width()
-}
-fn glyph_char_width(c: char, font_id: egui::FontId, ui: &mut egui::Ui) -> f32 {
-	ui.fonts(|f| f.glyph_width(&font_id, c))
-}
-
-// returns wheter the text was truncated
-fn draw_truncated_text(painter: &egui::Painter, ui: &mut egui::Ui, text: &str, max_width: f32, pos: egui::Pos2) -> bool {
-	let font_id = egui::TextStyle::Body.resolve(ui.style());
-
-	let text_width = glyph_width(text.to_string(), font_id.clone(), painter);
-	
-	if text_width > max_width {
-		let mut current_width = 0.0;
-		let mut truncated_length = 0;
-		for (i, char_width) in text.chars().map(|c| glyph_char_width(c, font_id.clone(), ui)).enumerate() {
-			current_width += char_width;
-			if current_width > max_width {
-				break;
-			}
-			truncated_length = i + 1;
-		}
-
-		painter.text(pos, egui::Align2::CENTER_CENTER, &text[..truncated_length], font_id, egui::Color32::WHITE);
-		true
-	} else {
-		painter.text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
-		false
-	}
 }

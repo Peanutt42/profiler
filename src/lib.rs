@@ -5,80 +5,15 @@ use serde::{Serialize, Deserialize};
 
 mod function_name;
 mod serialization;
+mod scope;
+pub use scope::{Scope, ScopeResult};
 
-#[derive(Clone)]
-#[cfg(not(feature = "disable_profiling"))]
-pub struct Scope {
-	pub name: String,
-    pub start: Instant,
-}
-
-#[cfg(not(feature = "disable_profiling"))]
-impl Scope {
-	pub fn new(name: String) -> Self {
-		PROFILER.with_borrow_mut(|p| p.begin_profile_result());
-		Self {
-			name,
-			start: Instant::now(),
-		}
-	}
-}
-
-#[cfg(not(feature = "disable_profiling"))]
-impl Drop for Scope {
-	fn drop(&mut self) {
-		let duration = self.start.elapsed();
-
-        PROFILER.with_borrow_mut(|p| p.submit_profile_result(self.name.clone(), self.start, duration));
-    }
-}
-
-#[macro_export]
-#[cfg(not(feature = "disable_profiling"))]
-macro_rules! scope {
-	($name:expr) => {
-		let _scope = profiler::Scope::new(format!("{}::{}", profiler::function_name!(), $name));
-	};
-}
-
-#[macro_export]
-#[cfg(feature = "disable_profiling")]
-macro_rules! scope {
-	($name:expr) => {
-		
-	};
-}
-
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct ProfileResult {
-	pub name: String,
-    pub start: Duration,
-    pub duration: Duration,
-	pub depth: usize,
-}
-
-impl ProfileResult {
-	pub fn new(name: String, start: Duration, duration: Duration, depth: usize) -> Self {
-		Self {
-            name,
-            start,
-            duration,
-			depth,
-        }
-	}
-	
-	pub fn is_inside(&self, other: &Self) -> bool {
-		let self_end = self.start + self.duration;
-		let other_end = other.start + other.duration;
-		self.start >= other.start && self_end <= other_end
-	}
-}
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Frame {
 	pub start: Duration,
 	pub duration: Duration,
-	pub profile_results: Vec<ProfileResult>,
+	pub scope_results: Vec<ScopeResult>,
 }
 
 impl Frame {
@@ -86,9 +21,16 @@ impl Frame {
 		Self {
 			start: Instant::now().duration_since(*program_start),
 			duration: Duration::from_secs(0),
-			profile_results: Vec::new(),
+			scope_results: Vec::new(),
 		}
 	}
+}
+
+
+thread_local! {
+	#[macro_export]
+	#[cfg(not(feature = "disable_profiling"))]
+	pub static PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
 }
 
 pub struct Profiler {
@@ -129,7 +71,7 @@ impl Profiler {
 			self.frames.push(Frame::new(&self.program_start));
 		}
 
-		self.frames.last_mut().unwrap().profile_results.push(ProfileResult::new(name, start.duration_since(self.program_start), duration, self.current_frame_call_depth - 1));
+		self.frames.last_mut().unwrap().scope_results.push(ScopeResult::new(name, start.duration_since(self.program_start), duration, self.current_frame_call_depth - 1));
 		self.current_frame_call_depth -= 1;
 	}
 }
@@ -140,11 +82,6 @@ impl Default for Profiler {
 	}
 }
 
-thread_local! {
-	#[macro_export]
-	#[cfg(not(feature = "disable_profiling"))]
-	pub static PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
-}
 
 #[macro_export]
 #[cfg(not(feature = "disable_profiling"))]
