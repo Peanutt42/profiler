@@ -1,4 +1,5 @@
 use std::time::{Instant, Duration};
+#[cfg(not(feature = "disable_profiling"))]
 use std::cell::RefCell;
 use serde::{Serialize, Deserialize};
 
@@ -6,11 +7,13 @@ mod function_name;
 mod serialization;
 
 #[derive(Clone)]
+#[cfg(not(feature = "disable_profiling"))]
 pub struct Scope {
 	pub name: String,
     pub start: Instant,
 }
 
+#[cfg(not(feature = "disable_profiling"))]
 impl Scope {
 	pub fn new(name: String) -> Self {
 		PROFILER.with_borrow_mut(|p| p.begin_profile_result());
@@ -21,6 +24,7 @@ impl Scope {
 	}
 }
 
+#[cfg(not(feature = "disable_profiling"))]
 impl Drop for Scope {
 	fn drop(&mut self) {
 		let duration = self.start.elapsed();
@@ -30,9 +34,18 @@ impl Drop for Scope {
 }
 
 #[macro_export]
+#[cfg(not(feature = "disable_profiling"))]
 macro_rules! scope {
 	($name:expr) => {
 		let _scope = profiler::Scope::new(format!("{}::{}", profiler::function_name!(), $name));
+	};
+}
+
+#[macro_export]
+#[cfg(feature = "disable_profiling")]
+macro_rules! scope {
+	($name:expr) => {
+		
 	};
 }
 
@@ -105,10 +118,12 @@ impl Profiler {
 		}
 	}
 
+	#[cfg(not(feature = "disable_profiling"))]
 	fn begin_profile_result(&mut self) {
 		self.current_frame_call_depth += 1;
 	}
 
+	#[cfg(not(feature = "disable_profiling"))]
 	fn submit_profile_result(&mut self, name: String, start: Instant, duration: Duration) {
 		if self.frames.is_empty() {
 			self.frames.push(Frame::new(&self.program_start));
@@ -126,14 +141,25 @@ impl Default for Profiler {
 }
 
 thread_local! {
+	#[macro_export]
+	#[cfg(not(feature = "disable_profiling"))]
 	pub static PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
 }
 
 #[macro_export]
+#[cfg(not(feature = "disable_profiling"))]
 macro_rules! new_frame {
 	() => {
 		{
-			profiler::PROFILER.with(|p| p.borrow_mut().new_frame());
+			profiler::PROFILER.with_borrow_mut(|p| p.new_frame());
 		}
+	};
+}
+
+#[macro_export]
+#[cfg(feature = "disable_profiling")]
+macro_rules! new_frame {
+	() => {
+		
 	};
 }

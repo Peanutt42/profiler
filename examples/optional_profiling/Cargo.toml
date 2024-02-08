@@ -1,0 +1,12 @@
+[package]
+name = "optional_profiling"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+profiler = { path = "../../" }
+profiler_attributes = { path = "../../profiler_attributes" }
+
+
+[features]
+disable_profiling = ["profiler/disable_profiling"]

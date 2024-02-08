@@ -31,10 +31,19 @@ impl Profiler {
 }
 
 #[macro_export]
+#[cfg(not(feature = "disable_profiling"))]
 macro_rules! save_to_file {
 	($filepath:expr) => {
-		if let Err(e) = profiler::PROFILER.with(|p| p.borrow_mut().save_to_file($filepath)) {
+		if let Err(e) = profiler::PROFILER.with_borrow_mut(|p| p.save_to_file($filepath)) {
 			println!("Failed to write to file {}: {}", $filepath.display(), e);
 		}
+	};
+}
+
+#[macro_export]
+#[cfg(feature = "disable_profiling")]
+macro_rules! save_to_file {
+	($filepath:expr) => {
+		
 	};
 }

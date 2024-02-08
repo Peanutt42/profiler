@@ -1,0 +1,8 @@
+[package]
+name = "serialization_stress_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+profiler = { path = "../../" }
+profiler_attributes = { path = "../../profiler_attributes" }
