@@ -10,7 +10,8 @@ pub fn profile(_args: TokenStream, input: TokenStream) -> TokenStream {
         syn::Item::Fn(fn_item) => fn_item,
         _ => panic!("expected fn")
     };
-    fn_item.block.stmts.insert(0,syn::parse(quote!(let ___scope = profiler::Scope::new(profiler::function_name!().to_string());).into()).unwrap());
+    let fn_name = &fn_item.sig.ident.to_string();
+    fn_item.block.stmts.insert(0,syn::parse(quote!(let ___scope = profiler::Scope::new(concat!(concat!(module_path!(), "::"), #fn_name).to_string());).into()).unwrap());
 
     use quote::ToTokens;
     item.into_token_stream().into()
