@@ -1,5 +1,9 @@
 # profiler
 simple rust instrumentation profiler
+
+Disclamer: this is just a toy project
+
+
 ```rust
 #[profile]
 fn work_1() {
