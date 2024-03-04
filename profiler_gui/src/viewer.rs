@@ -90,17 +90,12 @@ impl Viewer {
 					}
 					
 					let rect = egui::Rect::from_min_size(egui::Pos2::new(x as f32, y as f32), egui::Vec2::new(width as f32, function_height as f32));
-					canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
-					
-					let mut show_name_tooltip = false;
-					if width > 50.0 {
-						let truncated = draw_truncated_text(&canvas, ui, &scope_result.name, width as f32, rect.center());
-						if truncated {
-							show_name_tooltip = true;
-						}
+					if width > 10.0 {
+						canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
+						draw_truncated_text(&canvas, ui, &scope_result.name, width as f32, rect.center());
 					}
 					else {
-						show_name_tooltip = true;
+						canvas.rect_filled(rect, 0.0, egui::Color32::BLUE);
 					}
 					
 					let hovered: bool = self.mouse_pos.x as f64 >= x && self.mouse_pos.y as f64 >= y && self.mouse_pos.y as f64 <= y + function_height && self.mouse_pos.x as f64 <= x + width;
@@ -108,9 +103,7 @@ impl Viewer {
 						selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
 						
 						egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
-							if show_name_tooltip {
-								ui.label(&scope_result.name);
-							}
+							ui.label(&scope_result.name);
 							ui.label(format!("Duration: {}", format_duration(&scope_result.duration)));
 
 							let mut self_duration = scope_result.duration;
@@ -167,6 +160,7 @@ impl Viewer {
 	}
 
 	fn handle_input(&mut self, ctx: &egui::Context) {
+		let mut override_cursor_icon = None;
 		ctx.input(|i| {
 			if let Some(pos) = i.pointer.latest_pos() {
 				self.mouse_pos = pos;
@@ -187,11 +181,16 @@ impl Viewer {
 				self.view_start += mouse_delta.x as f64 / self.screen_width;
 				self.view_end += mouse_delta.x as f64 / self.screen_width;
 				self.offset_y -= mouse_delta.y as f64;
+				override_cursor_icon = Some(egui::CursorIcon::Grabbing);
 			}
 			if i.pointer.secondary_down() {
 				self.zoom(-0.005 * i.pointer.delta().y as f64, zoom_target);
+				override_cursor_icon = Some(egui::CursorIcon::ResizeRow);
 			}
 		});
+		if let Some(icon) = override_cursor_icon {
+			ctx.set_cursor_icon(icon);
+		}
 
 		let dt = ctx.input(|i| i.unstable_dt as f64);
 		// if the profiler has too low fps, just snap to target view
