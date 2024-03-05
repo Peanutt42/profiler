@@ -1,12 +1,12 @@
-use crate::Profiler;
+use crate::GlobalProfiler;
 use anyhow::Result;
 use std::path::Path;
 use std::fs::File;
 use std::io::Write;
 
-impl Profiler {
+impl GlobalProfiler {
 	pub fn from_binary(&mut self, bytes: &[u8]) -> bincode::Result<()> {
-		self.frames = bincode::deserialize(bytes)?;
+		self.thread_profilers = bincode::deserialize(bytes)?;
 
 		Ok(())
 	}
@@ -18,8 +18,7 @@ impl Profiler {
 	}
 
 	pub fn to_binary(&mut self) -> bincode::Result<Vec<u8>> {
-		self.finish_last_frame();
-		bincode::serialize(&self.frames)
+		bincode::serialize(&self.thread_profilers)
 	}
 
 	pub fn save_to_file<P>(&mut self, path: P) -> Result<()>
@@ -36,9 +35,7 @@ impl Profiler {
 #[cfg(not(feature = "disable_profiling"))]
 macro_rules! save_to_file {
 	($filepath:expr) => {
-		if let Err(e) = profiler::PROFILER.with_borrow_mut(|p| p.save_to_file($filepath)) {
-			eprintln!("Failed to write to file {}: {}", $filepath, e);
-		}
+		profiler::GLOBAL_PROFILER.lock().unwrap().save_to_file($filepath).expect(concat!("Failed to write to file {}", $filepath));
 	};
 }
 

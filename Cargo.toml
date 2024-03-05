@@ -9,6 +9,7 @@ members = [
 	"profiler_gui",
 	"examples/serialization_stress_test",
 	"examples/simple_serialization",
+	"examples/multithreading",
 	"examples/optional_profiling",
 ]
 
@@ -20,3 +21,4 @@ profiler_attributes = { path = "profiler_attributes" }
 serde = { version = "1.0.195", features = ["derive"] }
 bincode = "1.3.3"
 anyhow = "1.0"
+once_cell = "1.19.0"

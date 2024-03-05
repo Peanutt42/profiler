@@ -1,6 +1,9 @@
-use std::time::{Instant, Duration};
+use std::{hash::{Hash, Hasher}, time::{Duration, Instant}};
 #[cfg(not(feature = "disable_profiling"))]
 use std::cell::RefCell;
+use std::sync::Mutex;
+use std::collections::HashMap;
+use once_cell::sync::Lazy;
 use serde::{Serialize, Deserialize};
 
 mod function_name;
@@ -28,36 +31,35 @@ impl Frame {
 
 
 thread_local! {
-	#[macro_export]
 	#[cfg(not(feature = "disable_profiling"))]
 	pub static PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
 }
 
 pub struct Profiler {
-	pub frames: Vec<Frame>,
+	current_frame: Frame,
 	current_frame_call_depth: usize,
 	program_start: Instant,
 }
 
 impl Profiler {
 	pub fn new() -> Self {
+		let program_start = Instant::now();
 		Self {
-			frames: Vec::new(),
+			current_frame: Frame::new(&program_start),
 			current_frame_call_depth: 0,
-			program_start: Instant::now(),
+			program_start,
 		}
 	}
 
-	pub fn new_frame(&mut self) {
-		self.finish_last_frame();
-		self.frames.push(Frame::new(&self.program_start));
-		assert!(self.current_frame_call_depth == 0);
-	}
-
-	pub fn finish_last_frame(&mut self) {
-		if let Some(last_frame) = self.frames.last_mut() {
-			last_frame.duration = std::time::Instant::now().duration_since(self.program_start) - last_frame.start;
-		}
+	pub fn submit_frame(&mut self) {
+		self.current_frame.duration = std::time::Instant::now().duration_since(self.program_start) - self.current_frame.start;
+		let thread_id = get_current_thread_id_u64();
+		let mut global_profiler = GLOBAL_PROFILER.lock().unwrap();
+		global_profiler.thread_profilers
+			.entry(thread_id)
+			.or_default()
+			.frames.push(self.current_frame.clone());
+		self.current_frame = Frame::new(&self.program_start);
 	}
 
 	#[cfg(not(feature = "disable_profiling"))]
@@ -67,11 +69,7 @@ impl Profiler {
 
 	#[cfg(not(feature = "disable_profiling"))]
 	fn submit_profile_result(&mut self, name: String, start: Instant, duration: Duration) {
-		if self.frames.is_empty() {
-			self.frames.push(Frame::new(&self.program_start));
-		}
-
-		self.frames.last_mut().unwrap().scope_results.push(ScopeResult::new(name, start.duration_since(self.program_start), duration, self.current_frame_call_depth - 1));
+		self.current_frame.scope_results.push(ScopeResult::new(name, start.duration_since(self.program_start), duration, self.current_frame_call_depth - 1));
 		self.current_frame_call_depth -= 1;
 	}
 }
@@ -85,18 +83,74 @@ impl Default for Profiler {
 
 #[macro_export]
 #[cfg(not(feature = "disable_profiling"))]
-macro_rules! new_frame {
+macro_rules! submit_frame {
 	() => {
 		{
-			profiler::PROFILER.with_borrow_mut(|p| p.new_frame());
+			profiler::PROFILER.with_borrow_mut(|p| p.submit_frame());
 		}
 	};
 }
 
 #[macro_export]
 #[cfg(feature = "disable_profiling")]
-macro_rules! new_frame {
+macro_rules! submit_frame {
 	() => {
 		
 	};
 }
+
+
+fn get_current_thread_id_u64() -> u64 {
+	let thread_id = std::thread::current().id();
+	let mut hasher = std::hash::DefaultHasher::default();
+	thread_id.hash(&mut hasher);
+	hasher.finish()
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ThreadProfiler {
+	pub name: String,
+	pub frames: Vec<Frame>,
+}
+
+impl ThreadProfiler {
+	pub fn new(name: String, frames: Vec<Frame>) -> Self {
+		Self {
+			name,
+			frames,
+		}
+	}
+}
+
+impl Default for ThreadProfiler {
+	fn default() -> Self {
+		let thread_name = if let Some(thread_name) = std::thread::current().name() {
+			thread_name.to_string()
+		}
+		else {
+			"Unnamed Thread".to_string()
+		};
+		Self::new(thread_name, Vec::new())
+	}
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GlobalProfiler {
+	pub thread_profilers: HashMap<u64, ThreadProfiler>,
+}
+
+impl GlobalProfiler {
+	pub fn new() -> Self {
+		Self {
+			thread_profilers: HashMap::new(),
+		}
+	}
+}
+
+impl Default for GlobalProfiler {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
+pub static GLOBAL_PROFILER: Lazy<Mutex<GlobalProfiler>> = Lazy::new(|| Mutex::new(GlobalProfiler::new()));

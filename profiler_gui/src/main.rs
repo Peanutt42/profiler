@@ -1,7 +1,7 @@
 use eframe::egui;
 
 mod processed_profiler;
-use processed_profiler::ProcessedProfiler;
+use processed_profiler::ProcessedGlobalProfiler;
 
 mod viewer;
 use viewer::Viewer;

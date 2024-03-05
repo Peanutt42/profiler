@@ -1,4 +1,4 @@
-use profiler::{new_frame, scope, save_to_file};
+use profiler::{submit_frame, scope, save_to_file};
 use profiler_attributes::profile;
 
 #[profile]
@@ -17,12 +17,13 @@ fn work_2() {
 
 fn main() {
 	for i in 0..4 {
-		new_frame!();
+		{
+			scope!(format!("frame_{i}"));
 
-		scope!(format!("frame_{i}"));
-
-		work_1();
-		work_2();
+			work_1();
+			work_2();
+		}
+		submit_frame!();
 	}
 
 	save_to_file!("saved.profiling");
