@@ -179,15 +179,16 @@ impl Viewer {
 
 		let dt = ctx.input(|i| i.unstable_dt as f64);
 		// if the profiler has too low fps, just snap to target view
-		if dt < 1.0 / 15.0 {
+		if dt < 1.0 / 30.0 {
 			let smooth_start_difference = self.view_start - self.smooth_view_start;
 			let smooth_end_difference = self.view_end - self.smooth_view_end;
 			if smooth_start_difference.abs() < 0.01 || smooth_end_difference.abs() < 0.01 {
 				self.smooth_view_start = self.view_start;
 				self.smooth_view_end = self.view_end;
 			}
-			self.smooth_view_start += smooth_start_difference * 15.0 * dt;
-			self.smooth_view_end += smooth_end_difference * 15.0 * dt;
+			let amount = (15.0 * dt).min(1.0);
+			self.smooth_view_start += smooth_start_difference * amount;
+			self.smooth_view_end += smooth_end_difference * amount;
 		}
 		else {
 			self.smooth_view_start = self.view_start;
