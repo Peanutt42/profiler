@@ -132,7 +132,7 @@ impl Viewer {
 				}
 				canvas.text(egui::pos2(0.0, thread_name_height as f32), egui::Align2::LEFT_TOP, &thread_profiler.name, egui::FontId::default(), egui::Color32::WHITE).height();
 				cursor_y += largest_frame_height;
-				cursor_y += text_height * 2.0;
+				cursor_y += text_height * 3.0;
 			}
 			if let Some(selection_rect) = selection_rect {
 				canvas.rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
@@ -147,6 +147,29 @@ impl Viewer {
 	fn handle_input(&mut self, ctx: &egui::Context) {
 		let mut override_cursor_icon = None;
 		ctx.input(|i| {
+			// keyboard
+			if i.key_down(egui::Key::A) || i.key_down(egui::Key::ArrowLeft) {
+				self.view_start += 1.0 * i.unstable_dt as f64;
+				self.view_end += 1.0 * i.unstable_dt as f64;
+			}
+			if i.key_down(egui::Key::D) || i.key_down(egui::Key::ArrowRight) {
+				self.view_start -= 1.0 * i.unstable_dt as f64;
+				self.view_end -= 1.0 * i.unstable_dt as f64;
+			}
+			if i.key_down(egui::Key::W) {
+				self.zoom(-0.02, 0.5);
+			}
+			if i.key_down(egui::Key::S) {
+				self.zoom(0.02, 0.5);
+			}
+			if i.key_down(egui::Key::ArrowUp) {
+				self.offset_y -= 500.0 * i.unstable_dt as f64;
+			}
+			if i.key_down(egui::Key::ArrowDown) {
+				self.offset_y += 500.0 * i.unstable_dt as f64;
+			}
+			
+			// mouse
 			if let Some(pos) = i.pointer.latest_pos() {
 				self.mouse_pos = pos;
 			}
