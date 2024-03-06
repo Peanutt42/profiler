@@ -8,10 +8,10 @@ pub fn glyph_char_width(c: char, font_id: egui::FontId, ui: &mut egui::Ui) -> f3
 }
 
 // returns wheter the text was truncated
-pub fn draw_truncated_text(painter: &egui::Painter, ui: &mut egui::Ui, text: &str, max_width: f32, pos: egui::Pos2) -> bool {
+pub fn draw_truncated_text(ui: &mut egui::Ui, text: &str, max_width: f32, pos: egui::Pos2, clip_rect: egui::Rect) -> bool {
 	let font_id = egui::TextStyle::Body.resolve(ui.style());
 
-	let text_width = glyph_width(text.to_string(), font_id.clone(), painter);
+	let text_width = glyph_width(text.to_string(), font_id.clone(), ui.painter());
 	
 	if text_width > max_width {
 		let mut current_width = 0.0;
@@ -24,10 +24,10 @@ pub fn draw_truncated_text(painter: &egui::Painter, ui: &mut egui::Ui, text: &st
 			truncated_length = i + 1;
 		}
 
-		painter.text(pos, egui::Align2::CENTER_CENTER, &text[..truncated_length], font_id, egui::Color32::WHITE);
+		ui.painter().with_clip_rect(clip_rect).text(pos, egui::Align2::CENTER_CENTER, &text[..truncated_length], font_id, egui::Color32::WHITE);
 		true
 	} else {
-		painter.text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
+		ui.painter().with_clip_rect(clip_rect).text(pos, egui::Align2::CENTER_CENTER, text, font_id, egui::Color32::WHITE);
 		false
 	}
 }

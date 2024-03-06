@@ -1,6 +1,6 @@
 use eframe::egui;
 use profiler::GlobalProfiler;
-use std::{path::Path, time::Duration};
+use std::{path::Path, time::Duration, collections::HashMap};
 use crate::ProcessedGlobalProfiler;
 use crate::utils::draw_truncated_text;
 
@@ -9,13 +9,11 @@ pub struct Viewer {
 	loading_error_msg: Option<String>,
 	view_start: f64,
 	view_end: f64,
-	smooth_view_start: f64,
-	smooth_view_end: f64,
-	offset_y: f64,
 	screen_width: f64,
 	screen_height: f64,
 	mouse_pos: egui::Pos2,
 	profiler: Option<ProcessedGlobalProfiler>,
+	thread_profilers_collapsed: HashMap<String, bool>,
 }
 
 impl Viewer {
@@ -25,20 +23,18 @@ impl Viewer {
             loading_error_msg: None,
             view_start: 0.0,
             view_end: 1.0,
-            smooth_view_start: 0.0,
-            smooth_view_end: 1.0,
-            offset_y: 0.0,
             screen_width: 800.0,
             screen_height: 600.0,
             mouse_pos: egui::Pos2::new(0.0, 0.0),
             profiler: None,
+			thread_profilers_collapsed: HashMap::new(),
         }
 	}
 
 	fn calc_pos_x(&self, x: f64) -> f64 {
 		if let Some(profiler) = &self.profiler {
 			let relative_pos = x / profiler.total_time.as_secs_f64();
-			(self.smooth_view_start * (1.0 - relative_pos) + self.smooth_view_end * relative_pos) * self.screen_width
+			(self.view_start * (1.0 - relative_pos) + self.view_end * relative_pos) * self.screen_width
 		}
 		else {
 			0.0
@@ -57,86 +53,41 @@ impl Viewer {
 			if self.profiler.is_none() {
 				return;
 			}
-			let profiler = self.profiler.as_ref().unwrap();
 
-			let canvas = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, egui::Id::new("scope_results")));
-			
 			self.screen_width = ctx.screen_rect().width() as f64;
 			self.screen_height = ctx.screen_rect().height() as f64;
 			let rounding = 2.5;
-			let function_height = 28.0;
 			let hover_rect_offset = 1.0;
-			let mut cursor_y = -self.offset_y; // on what height to draw a thread_profiler
-			let text_height = 15.0;
-			let seperator_height = 4.0;
 			
-			let mut selection_rect: Option<egui::Rect> = None;
-			
-			for thread_profiler in profiler.thread_profilers.values() {
-				canvas.rect_filled(egui::Rect::from_min_size(egui::pos2(0.0, cursor_y as f32), egui::vec2(self.screen_width as f32, seperator_height as f32)), 0.0, egui::Color32::WHITE);
-				cursor_y += seperator_height;
-				let thread_name_height = cursor_y;
-				cursor_y += text_height;
-				let mut largest_frame_height = 0.0;
-				for frame in thread_profiler.frames.iter() {
-					let frame_start_pixel = self.calc_pos_x(frame.start.as_secs_f64());
-					let frame_end_pixel = self.calc_pos_x((frame.start + frame.duration).as_secs_f64());
-					if frame_start_pixel > self.screen_width || frame_end_pixel < 0.0 {
-						continue;
-					}
-					
-					for (i, scope_result) in frame.scope_results.iter().enumerate() {
-						let x = self.calc_pos_x(scope_result.start.as_secs_f64());
-						let y = scope_result.depth as f64 * function_height + cursor_y;
-						let width = self.calc_pos_x((scope_result.start + scope_result.duration).as_secs_f64()) - x;
-						if scope_result.depth as f64 * function_height > largest_frame_height {
-							largest_frame_height = scope_result.depth as f64 * function_height;
-						}
-						
-						if x > self.screen_width || x + width < 0.0 || y > self.screen_height {
-							continue;
-						}
-						
-						let rect = egui::Rect::from_min_size(egui::Pos2::new(x as f32, y as f32), egui::Vec2::new(width as f32, function_height as f32));
-						if width > 10.0 {
-							canvas.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
-							draw_truncated_text(&canvas, ui, &scope_result.name, width as f32, rect.center());
-						}
-						else {
-							canvas.rect_filled(rect, 0.0, egui::Color32::BLUE);
-						}
-						
-						let hovered: bool = self.mouse_pos.x as f64 >= x && self.mouse_pos.y as f64 >= y && self.mouse_pos.y as f64 <= y + function_height && self.mouse_pos.x as f64 <= x + width;
-						if hovered {
-							selection_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
-							
-							egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
-								ui.label(&scope_result.name);
-								ui.label(format!("Duration: {}", format_duration(&scope_result.duration)));
+			egui::Frame::dark_canvas(ui.style()).show(ui, |ui| {
+				let available_height = ui.max_rect().bottom() - ui.min_rect().bottom();
 
-								let mut self_duration = scope_result.duration;
-								for j in 0..frame.scope_results.len() {
-									if i == j {
-										continue;
-									}
-				
-									if scope_result.depth + 1 == frame.scope_results[j].depth && frame.scope_results[j].is_inside(scope_result) {
-										self_duration -= frame.scope_results[j].duration;
-									}
-								}
-								ui.label(format!("Self Duration: {}", format_duration(&self_duration)));
-								ui.label(format!("Thread: {}", thread_profiler.name));
-							});
-						}
+				egui::ScrollArea::vertical().show(ui, |ui| {
+					let mut canvas = ui.available_rect_before_wrap();
+					canvas.max.y = f32::INFINITY;
+					let response = ui.interact(canvas, ui.id(), egui::Sense::click_and_drag());
+					self.handle_interaction(ctx, &response);
+
+					let mut cursor_y = canvas.top() as f64;
+
+					let profiler = self.profiler.as_ref().unwrap();
+
+					let mut selection_rect = None;
+					for thread_profiler in profiler.thread_profilers.values() {
+						let mut collapsed = self.thread_profilers_collapsed.get(&thread_profiler.name).copied().unwrap_or(false);
+						self.draw_thread_profiler(ctx, ui, thread_profiler, &mut selection_rect, &mut cursor_y, &mut collapsed, canvas, rounding, hover_rect_offset);
+						self.thread_profilers_collapsed.insert(thread_profiler.name.clone(), collapsed);
 					}
-				}
-				canvas.text(egui::pos2(0.0, thread_name_height as f32), egui::Align2::LEFT_TOP, &thread_profiler.name, egui::FontId::default(), egui::Color32::WHITE).height();
-				cursor_y += largest_frame_height;
-				cursor_y += text_height * 3.0;
-			}
-			if let Some(selection_rect) = selection_rect {
-				canvas.rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
-			}
+					if let Some(selection_rect) = selection_rect {
+						ui.painter().rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
+					}
+
+					let mut used_rect = canvas;
+					used_rect.max.y = cursor_y as f32;
+					used_rect.max.y = used_rect.max.y.max(used_rect.min.y + available_height);
+					ui.allocate_rect(used_rect, egui::Sense::hover());
+				});
+			});
 		});		
 		
 		if self.show_open_file_dialog {
@@ -144,8 +95,103 @@ impl Viewer {
 		}
 	}
 
+	#[allow(clippy::too_many_arguments)]
+	fn draw_thread_profiler(&self, ctx: &egui::Context, ui: &mut egui::Ui, thread_profiler: &profiler::ThreadProfiler, selecton_rect: &mut Option<egui::Rect>, cursor_y: &mut f64, collapsed: &mut bool, canvas: egui::Rect, rounding: f32, hover_rect_offset: f32) {
+		let function_height = 28.0;
+		let text_height = 15.0;
+		let seperator_height = 1.0;
+
+		ui.painter().with_clip_rect(canvas).rect_filled(egui::Rect::from_min_size(egui::pos2(0.0, *cursor_y as f32), egui::vec2(self.screen_width as f32, seperator_height as f32)), 0.0, egui::Color32::WHITE);
+		*cursor_y += seperator_height;
+		let thread_name_height = *cursor_y;
+		*cursor_y += text_height;
+		let mut largest_frame_height = 0.0;
+
+		if !*collapsed {
+			for frame in thread_profiler.frames.iter() {
+				let frame_start_pixel = self.calc_pos_x(frame.start.as_secs_f64());
+				let frame_end_pixel = self.calc_pos_x((frame.start + frame.duration).as_secs_f64());
+				if frame_start_pixel > self.screen_width || frame_end_pixel < 0.0 {
+					continue;
+				}
+				
+				for scope_result in frame.scope_results.iter() {
+					let x = self.calc_pos_x(scope_result.start.as_secs_f64());
+					let y = scope_result.depth as f64 * function_height + *cursor_y;
+					let width = self.calc_pos_x((scope_result.start + scope_result.duration).as_secs_f64()) - x;
+					
+					if (scope_result.depth + 1) as f64 * function_height > largest_frame_height {
+						largest_frame_height = (scope_result.depth + 1) as f64 * function_height;
+					}
+					
+					if x > self.screen_width || x + width < 0.0 || y > self.screen_height {
+						continue;
+					}
+					
+					let rect = egui::Rect::from_min_size(egui::Pos2::new(x as f32, y as f32), egui::Vec2::new(width as f32, function_height as f32));
+					let painter = ui.painter().with_clip_rect(rect.intersect(canvas));
+					if width > 10.0 {
+						painter.rect(rect, rounding, egui::Color32::BLUE, egui::Stroke::new(1.5, egui::Color32::BLACK));
+						draw_truncated_text(ui, &scope_result.name, width as f32, rect.center(), rect.intersect(canvas));
+					}
+					else {
+						painter.rect_filled(rect, 0.0, egui::Color32::BLUE);
+					}
+					
+					let hovered: bool = self.mouse_pos.x as f64 >= x && self.mouse_pos.y as f64 >= y && self.mouse_pos.y as f64 <= y + function_height && self.mouse_pos.x as f64 <= x + width;
+					if hovered {
+						*selecton_rect = Some(egui::Rect::from_min_size(rect.min - egui::Vec2::new(hover_rect_offset, hover_rect_offset), rect.size() + egui::Vec2::new(2.0 * hover_rect_offset, 2.0 * hover_rect_offset)));
+						
+						self.draw_tooltip(ctx, scope_result, frame, &thread_profiler.name);
+					}
+				}
+			}
+		}
+		let text = format!("{} {}", if *collapsed { "⏵" } else { "⏷" }, thread_profiler.name);
+		let thread_name_rect = ui.painter().text(egui::pos2(canvas.min.x, thread_name_height as f32), egui::Align2::LEFT_TOP, text, egui::FontId::default(), egui::Color32::WHITE);
+		let thread_name_response = ui.interact(thread_name_rect, egui::Id::new(format!("thread_name_{}", thread_profiler.name)), egui::Sense::click());
+		if thread_name_response.clicked() {
+			*collapsed = !*collapsed;
+		}
+		*cursor_y += text_height;
+
+		*cursor_y += largest_frame_height;
+	}
+
+	fn draw_tooltip(&self, ctx: &egui::Context, scope_result: &profiler::ScopeResult, frame: &profiler::Frame, thread_name: &String) {
+		egui::show_tooltip_at_pointer(ctx, egui::Id::new("profiler_result_tooltip"), |ui| {
+			ui.label(&scope_result.name);
+			ui.label(format!("Duration: {}", format_duration(&scope_result.duration)));
+
+			let mut self_duration = scope_result.duration;
+			for i in 0..frame.scope_results.len() {
+				if scope_result.depth + 1 == frame.scope_results[i].depth && frame.scope_results[i].is_inside(scope_result) {
+					self_duration -= frame.scope_results[i].duration;
+				}
+			}
+			ui.label(format!("Self Duration: {}", format_duration(&self_duration)));
+			ui.label(format!("Thread: {}", thread_name));
+		});
+	}
+
+	fn handle_interaction(&mut self, ctx: &egui::Context, response: &egui::Response) {
+		if response.dragged_by(egui::PointerButton::Primary) {
+			self.view_start += response.drag_delta().x as f64 / self.screen_width;
+			self.view_end += response.drag_delta().x as f64 / self.screen_width;
+			ctx.set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+		}
+
+		// 0.0..1.0 inside the current view
+		let mouse_pos_relative_to_view = ((self.mouse_pos.x as f64 / self.screen_width) - self.view_start) / (self.view_end - self.view_start);
+		let zoom_target = self.view_start + (self.view_end - self.view_start) * mouse_pos_relative_to_view;
+		
+		if response.dragged_by(egui::PointerButton::Secondary) {
+			self.zoom(-0.005 * response.drag_delta().y as f64, zoom_target);
+			ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
+		}
+	}
+
 	fn handle_input(&mut self, ctx: &egui::Context) {
-		let mut override_cursor_icon = None;
 		ctx.input(|i| {
 			// keyboard
 			if i.key_down(egui::Key::A) || i.key_down(egui::Key::ArrowLeft) {
@@ -162,70 +208,17 @@ impl Viewer {
 			if i.key_down(egui::Key::S) {
 				self.zoom(0.02, 0.5);
 			}
-			if i.key_down(egui::Key::ArrowUp) {
-				self.offset_y -= 500.0 * i.unstable_dt as f64;
-			}
-			if i.key_down(egui::Key::ArrowDown) {
-				self.offset_y += 500.0 * i.unstable_dt as f64;
-			}
 			
 			// mouse
 			if let Some(pos) = i.pointer.latest_pos() {
 				self.mouse_pos = pos;
 			}
-
-			// 0.0..1.0 inside the current view
-			let mouse_pos_relative_to_view = ((self.mouse_pos.x as f64 / self.screen_width) - self.view_start) / (self.view_end - self.view_start);
-			let zoom_target = self.view_start + (self.view_end - self.view_start) * mouse_pos_relative_to_view;
-					
-			for e in i.events.iter() {
-				if let egui::Event::MouseWheel { unit: _, delta, modifiers: _ } = e {
-					self.zoom(-0.1 * delta.y as f64, zoom_target);
-				}
-			}
-
-			if i.pointer.primary_down() {
-				let mouse_delta = i.pointer.delta();
-				self.view_start += mouse_delta.x as f64 / self.screen_width;
-				self.view_end += mouse_delta.x as f64 / self.screen_width;
-				self.offset_y -= mouse_delta.y as f64;
-				override_cursor_icon = Some(egui::CursorIcon::Grabbing);
-			}
-			if i.pointer.secondary_down() {
-				self.zoom(-0.005 * i.pointer.delta().y as f64, zoom_target);
-				override_cursor_icon = Some(egui::CursorIcon::ResizeRow);
-			}
 		});
-		if let Some(icon) = override_cursor_icon {
-			ctx.set_cursor_icon(icon);
-		}
-
-		let dt = ctx.input(|i| i.unstable_dt as f64);
-		// if the profiler has too low fps, just snap to target view
-		if dt < 1.0 / 30.0 {
-			let smooth_start_difference = self.view_start - self.smooth_view_start;
-			let smooth_end_difference = self.view_end - self.smooth_view_end;
-			if smooth_start_difference.abs() < 0.01 || smooth_end_difference.abs() < 0.01 {
-				self.smooth_view_start = self.view_start;
-				self.smooth_view_end = self.view_end;
-			}
-			let amount = (15.0 * dt).min(1.0);
-			self.smooth_view_start += smooth_start_difference * amount;
-			self.smooth_view_end += smooth_end_difference * amount;
-		}
-		else {
-			self.smooth_view_start = self.view_start;
-            self.smooth_view_end = self.view_end;
-		}
 
 		if self.view_start >= self.view_end {
 			self.view_start = 0.0;
-			self.smooth_view_start = 0.0;
 			self.view_end  = 1.0;
-			self.smooth_view_end = 1.0;
 		}
-
-		self.offset_y = self.offset_y.max(0.0);
 	}
 
 	fn zoom(&mut self, mut amount: f64, zoom_target: f64) {
@@ -244,10 +237,13 @@ impl Viewer {
 		}
 		else {
 			self.loading_error_msg = None;
-			self.profiler = Some(ProcessedGlobalProfiler::new(loaded_profiler.thread_profilers));
+			let global_profiler = ProcessedGlobalProfiler::new(loaded_profiler.thread_profilers);
+			for thread_profiler in global_profiler.thread_profilers.values() {
+				self.thread_profilers_collapsed.insert(thread_profiler.name.clone(), false);
+			}
+			self.profiler = Some(global_profiler);
 			self.view_start  = 0.0;
 			self.view_end = 1.0;
-			self.offset_y = 0.0;
 			self.show_open_file_dialog = false;
 		}
 	}
