@@ -79,7 +79,7 @@ impl Viewer {
 						self.thread_profilers_collapsed.insert(thread_profiler.name.clone(), collapsed);
 					}
 					if let Some(selection_rect) = selection_rect {
-						ui.painter().rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
+						ui.painter().with_clip_rect(canvas).rect_stroke(selection_rect, rounding, egui::Stroke::new(2.0 * hover_rect_offset, egui::Color32::YELLOW));
 					}
 
 					let mut used_rect = canvas;
