@@ -99,12 +99,12 @@ impl Viewer {
 	fn draw_thread_profiler(&self, ctx: &egui::Context, ui: &mut egui::Ui, thread_profiler: &profiler::ThreadProfiler, selecton_rect: &mut Option<egui::Rect>, cursor_y: &mut f64, collapsed: &mut bool, canvas: egui::Rect, rounding: f32, hover_rect_offset: f32) {
 		let function_height = 28.0;
 		let text_height = 15.0;
-		let seperator_height = 1.0;
+		let seperator_size = 1.0;
 
-		ui.painter().with_clip_rect(canvas).rect_filled(egui::Rect::from_min_size(egui::pos2(0.0, *cursor_y as f32), egui::vec2(self.screen_width as f32, seperator_height as f32)), 0.0, egui::Color32::WHITE);
-		*cursor_y += seperator_height;
+		let seperator_height = *cursor_y;
+		*cursor_y += seperator_size;
 		let thread_name_height = *cursor_y;
-		*cursor_y += text_height;
+		*cursor_y += text_height * 1.5;
 		let mut largest_frame_height = 0.0;
 
 		if !*collapsed {
@@ -148,12 +148,31 @@ impl Viewer {
 			}
 		}
 		let text = format!("{} {}", if *collapsed { "⏵" } else { "⏷" }, thread_profiler.name);
-		let thread_name_rect = ui.painter().text(egui::pos2(canvas.min.x, thread_name_height as f32), egui::Align2::LEFT_TOP, text, egui::FontId::default(), egui::Color32::WHITE);
-		let thread_name_response = ui.interact(thread_name_rect, egui::Id::new(format!("thread_name_{}", thread_profiler.name)), egui::Sense::click());
+		let galley = ctx.fonts(|f| {
+			f.layout_no_wrap(
+				text,
+				egui::FontId::default().clone(),
+				egui::Color32::PLACEHOLDER,
+			)
+		});
+		let pos = egui::pos2(canvas.min.x, thread_name_height as f32);
+		let mut rect = egui::Rect::from_min_size(pos, galley.size());
+		rect.set_width(self.screen_width as f32);
+		
+		let thread_name_response = ui.interact(rect, egui::Id::new(format!("thread_name_{}", thread_profiler.name)), egui::Sense::click());
+		let mut color = egui::Color32::from_white_alpha(180);
 		if thread_name_response.clicked() {
 			*collapsed = !*collapsed;
+			color = egui::Color32::from_white_alpha(100);
 		}
+		if thread_name_response.hovered() {
+			color = egui::Color32::WHITE;
+		}
+		ui.painter().galley(rect.min, galley, color);
 		*cursor_y += text_height;
+		
+		let seperator_color = if thread_name_response.hovered() { egui::Color32::WHITE } else { egui::Color32::from_white_alpha(200) };
+		ui.painter().with_clip_rect(canvas).rect_filled(egui::Rect::from_min_size(egui::pos2(0.0, seperator_height as f32), egui::vec2(self.screen_width as f32, seperator_size as f32)), 0.0, seperator_color);
 
 		*cursor_y += largest_frame_height;
 	}
