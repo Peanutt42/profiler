@@ -7,9 +7,11 @@ edition = "2021"
 members = [
 	"profiler_attributes",
 	"profiler_gui",
+	"profiler_viewer",
 	"examples/serialization_stress_test",
 	"examples/simple_serialization",
 	"examples/multithreading",
+	"examples/embedded",
 	"examples/optional_profiling",
 ]
 

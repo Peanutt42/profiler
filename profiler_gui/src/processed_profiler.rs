@@ -1,6 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 use profiler::ThreadProfiler;
 
+#[derive(Debug, Clone)]
 pub struct ProcessedGlobalProfiler {
 	pub total_time: Duration,
 	pub thread_profilers: HashMap<u64, ThreadProfiler>,
