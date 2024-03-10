@@ -11,13 +11,10 @@ fn work() {
 fn background_thread(how_much_work: Arc<Mutex<i32>>, quit: Arc<Mutex<bool>>) {
 	while !*quit.lock().unwrap() {
 		let how_much_work = *how_much_work.lock().unwrap();
-		if how_much_work == 0 {
-			break;
-		}
-
 		for _ in 0..how_much_work {
 			work();
 		}
+		
 		submit_frame!();
 	}
 }

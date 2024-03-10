@@ -131,7 +131,7 @@ impl Viewer {
 			for frame in thread_profiler.frames.iter() {
 				let frame_start_pixel = self.calc_pos_x(frame.start.as_secs_f64());
 				let frame_end_pixel = self.calc_pos_x((frame.start + frame.duration).as_secs_f64());
-				if frame_start_pixel > self.view_width || frame_end_pixel < 0.0 {
+				if (frame_start_pixel + canvas.min.x as f64) > self.view_width && (frame_end_pixel + canvas.min.x as f64) < 0.0 {
 					continue;
 				}
 				
