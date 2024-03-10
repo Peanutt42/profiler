@@ -69,9 +69,6 @@ impl Viewer {
 			self.open_file_dialog(ui.ctx());
 		}
 
-		// disable reactive mode
-		ui.ctx().request_repaint();
-
 		self.handle_drag_and_drop(ui.ctx());
 
 		self.handle_input(ui.ctx());
@@ -219,6 +216,7 @@ impl Viewer {
 			self.view_start += response.drag_delta().x as f64 / self.view_width;
 			self.view_end += response.drag_delta().x as f64 / self.view_width;
 			ctx.set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+			ctx.request_repaint();
 		}
 
 		// 0.0..1.0 inside the current view
@@ -228,25 +226,32 @@ impl Viewer {
 		if response.dragged_by(egui::PointerButton::Secondary) {
 			self.zoom(-0.005 * response.drag_delta().y as f64, zoom_target);
 			ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
+			ctx.request_repaint();
 		}
 	}
 
 	fn handle_input(&mut self, ctx: &egui::Context) {
+		let mut request_repaint = false;
+		
 		ctx.input(|i| {
 			// keyboard
 			if i.key_down(egui::Key::A) || i.key_down(egui::Key::ArrowLeft) {
-				self.view_start += 1.0 * i.unstable_dt as f64;
-				self.view_end += 1.0 * i.unstable_dt as f64;
+				self.view_start += 1.0 * i.stable_dt as f64;
+				self.view_end += 1.0 * i.stable_dt as f64;
+				request_repaint = true;
 			}
 			if i.key_down(egui::Key::D) || i.key_down(egui::Key::ArrowRight) {
-				self.view_start -= 1.0 * i.unstable_dt as f64;
-				self.view_end -= 1.0 * i.unstable_dt as f64;
+				self.view_start -= 1.0 * i.stable_dt as f64;
+				self.view_end -= 1.0 * i.stable_dt as f64;
+				request_repaint = true;
 			}
 			if i.key_down(egui::Key::W) {
 				self.zoom(-0.02, 0.5);
+				request_repaint = true;
 			}
 			if i.key_down(egui::Key::S) {
 				self.zoom(0.02, 0.5);
+				request_repaint = true;
 			}
 			
 			// mouse
@@ -258,6 +263,11 @@ impl Viewer {
 		if self.view_start >= self.view_end {
 			self.view_start = 0.0;
 			self.view_end  = 1.0;
+			ctx.request_repaint();
+		}
+
+		if request_repaint {
+			ctx.request_repaint();
 		}
 	}
 
