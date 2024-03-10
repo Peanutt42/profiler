@@ -1,5 +1,10 @@
-use std::time::{Instant, Duration};
+
+
+#[cfg(not(feature = "disable_profiling"))]
+use std::time::Instant;
+use std::time::Duration;
 use serde::{Serialize, Deserialize};
+#[cfg(not(feature = "disable_profiling"))]
 use crate::PROFILER;
 
 #[derive(Clone)]

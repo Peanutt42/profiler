@@ -9,7 +9,9 @@ use serde::{Serialize, Deserialize};
 mod function_name;
 mod serialization;
 mod scope;
-pub use scope::{Scope, ScopeResult};
+#[cfg(not(feature = "disable_profiling"))]
+pub use scope::Scope;
+pub use scope::ScopeResult;
 
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -37,6 +39,7 @@ thread_local! {
 
 pub struct Profiler {
 	current_frame: Frame,
+	#[cfg(not(feature = "disable_profiling"))]
 	current_frame_call_depth: usize,
 	program_start: Instant,
 }
@@ -46,6 +49,7 @@ impl Profiler {
 		let program_start = Instant::now();
 		Self {
 			current_frame: Frame::new(&program_start),
+			#[cfg(not(feature = "disable_profiling"))]
 			current_frame_call_depth: 0,
 			program_start,
 		}
