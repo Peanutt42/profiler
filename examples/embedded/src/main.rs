@@ -38,6 +38,8 @@ fn main() -> eframe::Result<()> {
 		.unwrap();
 	
 	let result = eframe::run_simple_native("Embedded Example", options, move |ctx, _frame| {
+		ctx.request_repaint();
+
 		egui::CentralPanel::default().show(ctx, |ui| {
 			let mut new_how_much_work = *how_much_work_clone.lock().unwrap();
 			ui.add(egui::Slider::new(&mut new_how_much_work, 1..=100).text("How much work"));

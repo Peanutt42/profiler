@@ -13,6 +13,8 @@ mod scope;
 pub use scope::Scope;
 pub use scope::ScopeResult;
 
+#[cfg(feature = "attribute")]
+pub use profiler_attributes::profile;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Frame {
