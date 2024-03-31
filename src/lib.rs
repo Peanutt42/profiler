@@ -1,5 +1,5 @@
 use std::{hash::{Hash, Hasher}, time::{Duration, Instant}};
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 use std::cell::RefCell;
 use std::sync::Mutex;
 use std::collections::HashMap;
@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 mod function_name;
 mod serialization;
 mod scope;
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 pub use scope::Scope;
 pub use scope::ScopeResult;
 
@@ -35,13 +35,13 @@ impl Frame {
 
 
 thread_local! {
-	#[cfg(not(feature = "disable_profiling"))]
+	#[cfg(feature = "enable_profiling")]
 	pub static PROFILER: RefCell<Profiler> = RefCell::new(Profiler::new());
 }
 
 pub struct Profiler {
 	current_frame: Frame,
-	#[cfg(not(feature = "disable_profiling"))]
+	#[cfg(feature = "enable_profiling")]
 	current_frame_call_depth: usize,
 	program_start: Instant,
 }
@@ -51,7 +51,7 @@ impl Profiler {
 		let program_start = Instant::now();
 		Self {
 			current_frame: Frame::new(&program_start),
-			#[cfg(not(feature = "disable_profiling"))]
+			#[cfg(feature = "enable_profiling")]
 			current_frame_call_depth: 0,
 			program_start,
 		}
@@ -68,12 +68,12 @@ impl Profiler {
 		self.current_frame = Frame::new(&self.program_start);
 	}
 
-	#[cfg(not(feature = "disable_profiling"))]
+	#[cfg(feature = "enable_profiling")]
 	fn begin_profile_result(&mut self) {
 		self.current_frame_call_depth += 1;
 	}
 
-	#[cfg(not(feature = "disable_profiling"))]
+	#[cfg(feature = "enable_profiling")]
 	fn submit_profile_result(&mut self, name: String, start: Instant, duration: Duration) {
 		self.current_frame.scope_results.push(ScopeResult::new(name, start.duration_since(self.program_start), duration, self.current_frame_call_depth - 1));
 		self.current_frame_call_depth -= 1;
@@ -88,7 +88,7 @@ impl Default for Profiler {
 
 
 #[macro_export]
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 macro_rules! submit_frame {
 	() => {
 		{
@@ -98,7 +98,7 @@ macro_rules! submit_frame {
 }
 
 #[macro_export]
-#[cfg(feature = "disable_profiling")]
+#[cfg(not(feature = "enable_profiling"))]
 macro_rules! submit_frame {
 	() => {
 		

@@ -1,9 +1,9 @@
 use proc_macro::TokenStream;
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 use quote::quote;
 
 #[proc_macro_attribute]
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 pub fn profile(_args: TokenStream, input: TokenStream) -> TokenStream {
 	let mut item: syn::Item = syn::parse(input).unwrap();
     let fn_item = match &mut item {
@@ -18,7 +18,7 @@ pub fn profile(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-#[cfg(feature = "disable_profiling")]
+#[cfg(not(feature = "enable_profiling"))]
 pub fn profile(_args: TokenStream, input: TokenStream) -> TokenStream {
     input
 }

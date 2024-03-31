@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-profiler = { path = "../../" }
+profiler = { path = "../../", features = ["enable_profiling"] }

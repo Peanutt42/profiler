@@ -32,7 +32,7 @@ impl GlobalProfiler {
 }
 
 #[macro_export]
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 macro_rules! save_to_file {
 	($filepath:expr) => {
 		profiler::GLOBAL_PROFILER.lock().unwrap().save_to_file($filepath).expect(concat!("Failed to write to file {}", $filepath));
@@ -40,7 +40,7 @@ macro_rules! save_to_file {
 }
 
 #[macro_export]
-#[cfg(feature = "disable_profiling")]
+#[cfg(not(feature = "enable_profiling"))]
 macro_rules! save_to_file {
 	($filepath:expr) => {
 		

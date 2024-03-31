@@ -9,4 +9,4 @@ profiler_attributes = { path = "../../profiler_attributes" }
 
 
 [features]
-disable_profiling = ["profiler/disable_profiling"]
+enable_profiling = ["profiler/enable_profiling"]

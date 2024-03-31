@@ -16,7 +16,7 @@ members = [
 ]
 
 [features]
-disable_profiling = ["profiler_attributes/disable_profiling"]
+enable_profiling = ["profiler_attributes/enable_profiling"]
 attribute = ["profiler_attributes"]
 
 [dependencies]

@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 profiler = { path = "../../" }
-profiler_attributes = { path = "../../profiler_attributes" }
+profiler_attributes = { path = "../../profiler_attributes", features = ["enable_profiling"] }

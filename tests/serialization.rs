@@ -1,16 +1,16 @@
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 use profiler::{GlobalProfiler, GLOBAL_PROFILER, submit_frame};
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 use profiler_attributes::profile;
 
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 #[profile]
 fn work() {
 	std::thread::sleep(std::time::Duration::from_millis(50));
 }
 
 #[test]
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 fn serialization_test() {
 	{
 		for _ in 0..10 {

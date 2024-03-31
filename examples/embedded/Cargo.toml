@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-profiler = { path = "../../" }
+profiler = { path = "../../", features = ["enable_profiling"] }
 profiler_attributes = { path = "../../profiler_attributes" }
 profiler_gui = { path = "../../profiler_gui" }
 eframe = "0.25"

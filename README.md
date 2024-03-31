@@ -3,6 +3,11 @@ simple rust instrumentation profiler
 
 Disclamer: this is just a toy project
 
+!Make sure that you add the "enable_profiling" feature when you want to profile!
+```toml
+profiler = { git = "https://github.com/Peanutt42/profiler", features = ["enable_profiling", "attribute"] }
+```
+
 
 ```rust
 #[profile]

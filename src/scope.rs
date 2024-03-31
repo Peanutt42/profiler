@@ -1,20 +1,20 @@
 
 
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 use std::time::Instant;
 use std::time::Duration;
 use serde::{Serialize, Deserialize};
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 use crate::PROFILER;
 
 #[derive(Clone)]
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 pub struct Scope {
 	pub name: String,
     pub start: Instant,
 }
 
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 impl Scope {
 	pub fn new(name: String) -> Self {
 		PROFILER.with_borrow_mut(|p| p.begin_profile_result());
@@ -25,7 +25,7 @@ impl Scope {
 	}
 }
 
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 impl Drop for Scope {
 	fn drop(&mut self) {
 		let duration = self.start.elapsed();
@@ -35,7 +35,7 @@ impl Drop for Scope {
 }
 
 #[macro_export]
-#[cfg(not(feature = "disable_profiling"))]
+#[cfg(feature = "enable_profiling")]
 macro_rules! scope {
 	($name:expr) => {
 		let _scope = profiler::Scope::new(format!("{}::{}", profiler::function_name!(), $name));
@@ -43,7 +43,7 @@ macro_rules! scope {
 }
 
 #[macro_export]
-#[cfg(feature = "disable_profiling")]
+#[cfg(not(feature = "enable_profiling"))]
 macro_rules! scope {
 	($name:expr) => {
 		
